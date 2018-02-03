@@ -5,11 +5,15 @@ pkgdesc="Jolla phone"
 url="https://github.com/postmarketOS"
 arch="noarch"
 license="MIT"
-depends="linux-jolla-sbj"
+depends="mkbootimg linux-jolla-sbj"
 makedepends=""
 install=""
 subpackages=""
-source="deviceinfo initfs-hook.sh profile.sh"
+source="
+	deviceinfo 
+	initfs-hook.sh 
+	profile.sh
+"
 options="!check"
 
 build() {
