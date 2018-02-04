@@ -1,0 +1,33 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=karchive
+pkgver=5.42.0
+pkgrel=0
+pkgdesc='Qt 5 addon providing access to numerous types of archives'
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="LGPL-2.1"
+depends=""
+makedepends="extra-cmake-modules doxygen qt5-qttools-dev"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+subpackages="$pkgname-dev"
+options="!check" # armhf problems
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+sha512sums="4599c6e5018f51b84062fa84bb312f5461d6b7209b3e5f10e701ee7b7e9fe54b5bd2820de188e779dd70eebc73219ca47e7e14c994b9a49b3ca1f900fabe6e57  karchive-5.42.0.tar.xz"

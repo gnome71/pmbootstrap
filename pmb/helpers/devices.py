@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -27,7 +27,7 @@ def list(args):
     :returns: ["first-device", "second-device", ...]
     """
     ret = []
-    for path in glob.glob(args.aports + "/device-*"):
+    for path in glob.glob(args.aports + "/device/device-*"):
         device = os.path.basename(path).split("-", 1)[1]
         ret += [device]
     return ret
@@ -40,5 +40,5 @@ def list_apkbuilds(args):
     ret = {}
     for device in list(args):
         apkbuild_path = args.aports + "/device-" + device + "/APKBUILD"
-        ret[device] = pmb.parse.apkbuild(apkbuild_path)
+        ret[device] = pmb.parse.apkbuild(args, apkbuild_path)
     return ret

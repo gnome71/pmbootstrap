@@ -1,0 +1,35 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=kauth
+pkgver=5.42.0
+pkgrel=0
+pkgdesc='Abstraction to system policy and authentication features'
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="LGPL-2.1"
+depends=""
+depends_dev="kcoreaddons-dev"
+makedepends="$depends_dev extra-cmake-modules qt5-qttools-dev doxygen polkit-qt-dev polkit-qt"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib \
+		-DKDE_INSTALL_LIBEXECDIR=lib \
+		-DBUILD_QCH=ON
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest -E KAuthHelperTest
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+sha512sums="68d9f5ccc14e368ebff6e7081eaeb6d1511fe2cf99146b87876fb94d9c4151764204b023c3c0d2915bee11e02a99d2d1a2ef332589bb027d9b0dd8bb5bbc0be5  kauth-5.42.0.tar.xz"

@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -21,10 +21,11 @@ import sys
 import pytest
 
 # Import from parent directory
-sys.path.append(os.path.abspath(
-    os.path.join(os.path.dirname(__file__) + "/..")))
-import pmb.parse.apkindex
+pmb_src = os.path.realpath(os.path.join(os.path.dirname(__file__) + "/.."))
+sys.path.append(pmb_src)
 import pmb.helpers.git
+import pmb.helpers.logging
+import pmb.parse.version
 
 
 @pytest.fixture
@@ -32,36 +33,42 @@ def args(request):
     import pmb.parse
     sys.argv = ["pmbootstrap.py", "chroot"]
     args = pmb.parse.arguments()
-    setattr(args, "logfd", open("/dev/null", "a+"))
+    args.log = args.work + "/log_testsuite.txt"
+    pmb.helpers.logging.init(args)
     request.addfinalizer(args.logfd.close)
     return args
 
 
 def test_version(args):
-    # clone official test file from apk-tools
-    pmb.helpers.git.clone(args, "apk-tools")
-    path = args.work + "/cache_git/apk-tools/test/version.data"
+    # Fail after the first error or print a grand total of failures
+    keep_going = False
 
+    # Iterate over the version tests from apk-tools
+    path = pmb_src + "/test/testdata/version/version.data"
     mapping = {-1: "<", 0: "=", 1: ">"}
+    count = 0
+    errors = []
     with open(path) as handle:
         for line in handle:
             split = line.split(" ")
             a = split[0]
-            b = split[2].rstrip()
+            b = split[2].split("#")[0].rstrip()
             expected = split[1]
+            print("(#" + str(count) + ") " + line.rstrip())
+            result = pmb.parse.version.compare(a, b)
+            real = mapping[result]
 
-            # Alpine packages nowadays always have '-r' in their version
-            if "-r" not in a or "-r" not in b:
-                continue
+            count += 1
+            if real != expected:
+                if keep_going:
+                    errors.append(line.rstrip() + " (got: '" + real + "')")
+                else:
+                    assert real == expected
 
-            print(line.rstrip())
-            try:
-                result = pmb.parse.apkindex.compare_version(a, b)
-                real = mapping[result]
-            except TypeError:
-                # FIXME: Bug in Python:
-                # https://bugs.python.org/issue14894
-                # When this happens in pmbootstrap, it will also raise the
-                                # TypeError exception.
-                continue
-            assert(real == expected)
+    print("---")
+    print("total: " + str(count))
+    print("errors: " + str(len(errors)))
+    print("---")
+    for error in errors:
+        print(error)
+    assert errors == []

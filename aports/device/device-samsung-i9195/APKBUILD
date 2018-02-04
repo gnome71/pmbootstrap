@@ -1,0 +1,22 @@
+# Reference: <https://postmarketos.org/devicepkg>
+pkgname="device-samsung-i9195"
+pkgdesc="Samsung Galaxy S4 Mini"
+pkgver=0.2
+pkgrel=0
+url="https://postmarketos.org"
+license="MIT"
+arch="noarch"
+options="!check"
+depends="linux-samsung-i9195 mkbootimg"
+makedepends="devicepkg-dev"
+source="deviceinfo"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+}
+
+sha512sums="db89ff314a38c4ea37b128ea1eca00e5e0cffb660e07f2c4852725358bed3b94f834bbff91681a74e8b58ad972a87d9a6e7505c3530b11ab909c685721e75fcf  deviceinfo"

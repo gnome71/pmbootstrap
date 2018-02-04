@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -22,9 +22,11 @@ import pytest
 import filecmp
 
 # Import from parent directory
-sys.path.append(os.path.abspath(
+sys.path.append(os.path.realpath(
     os.path.join(os.path.dirname(__file__) + "/..")))
 import pmb.aportgen
+import pmb.config
+import pmb.helpers.logging
 
 
 @pytest.fixture
@@ -32,10 +34,12 @@ def args(tmpdir, request):
     import pmb.parse
     sys.argv = ["pmbootstrap.py", "chroot"]
     args = pmb.parse.arguments()
-    setattr(args, "logfd", open("/dev/null", "a+"))
+    args.log = args.work + "/log_testsuite.txt"
+    pmb.helpers.logging.init(args)
+    request.addfinalizer(args.logfd.close)
     setattr(args, "_aports_real", args.aports)
     args.aports = str(tmpdir)
-    request.addfinalizer(args.logfd.close)
+    pmb.helpers.run.user(args, ["mkdir", "-p", str(tmpdir) + "/cross"])
     return args
 
 
@@ -43,12 +47,16 @@ def test_aportgen(args):
     # Create aportgen folder -> code path where it still exists
     pmb.helpers.run.user(args, ["mkdir", "-p", args.work + "/aportgen"])
 
-    # Generate all valid packages (gcc-armhf twice, so the output folder
-    # exists)
-    for pkgname in ["binutils-armhf", "musl-armhf", "gcc-armhf", "gcc-armhf"]:
+    # Generate all valid packages
+    pkgnames = []
+    for arch in pmb.config.build_device_architectures:
+        # gcc twice, so the output folder already exists -> different code path
+        for pkgname in ["binutils", "musl", "busybox-static", "gcc", "gcc"]:
+            pkgnames.append(pkgname + "-" + arch)
+    for pkgname in pkgnames:
         pmb.aportgen.generate(args, pkgname)
-        path_new = args.aports + "/" + pkgname + "/APKBUILD"
-        path_old = args._aports_real + "/" + pkgname + "/APKBUILD"
+        path_new = args.aports + "/cross/" + pkgname + "/APKBUILD"
+        path_old = args._aports_real + "/cross/" + pkgname + "/APKBUILD"
         assert os.path.exists(path_new)
         assert filecmp.cmp(path_new, path_old, False)
 

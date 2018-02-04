@@ -1,51 +1,64 @@
 # pmbootstrap
-Sophisticated chroot/build/flash tool to develop and install [postmarketOS](https://ollieparanoid.github.io/post/postmarketOS).
 
+[**Introduction**](https://postmarketos.org/blog/2017/05/26/intro/) | [**Security Warning**](https://ollieparanoid.github.io/post/security-warning/) | [**Supported Devices**](https://wiki.postmarketos.org/wiki/Supported_devices) | [![travis badge](https://api.travis-ci.org/postmarketOS/pmbootstrap.png?branch=master)](https://travis-ci.org/postmarketOS/pmbootstrap) | [![Coverage status](https://coveralls.io/repos/github/postmarketOS/pmbootstrap/badge.svg)](https://coveralls.io/github/postmarketOS)
 
-[Static code analysis](https://github.com/postmarketOS/pmbootstrap/blob/master/test/static_code_analysis.sh) status: [![travis badge](https://api.travis-ci.org/postmarketOS/pmbootstrap.png?branch=master)](https://travis-ci.org/postmarketOS/pmbootstrap)
+Sophisticated chroot/build/flash tool to develop and install postmarketOS.
+
+For in-depth information please refer to the [postmarketOS wiki](https://wiki.postmarketos.org).
 
 ## Requirements
-* GNU/Linux
-* Python 3
+* 2 GB of RAM recommended for compiling
+* Linux distribution (`x86_64` or `aarch64`)
+  * [Windows subsystem for Linux (WSL)](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux) does **not** work! Please use [VirtualBox](https://www.virtualbox.org/) instead.
+  * Kernels based on the grsec patchset [do **not** work](https://github.com/postmarketOS/pmbootstrap/issues/107) *(Alpine: use linux-vanilla instead of linux-hardened, Arch: linux-hardened [is not based on grsec](https://www.reddit.com/r/archlinux/comments/68b2jn/linuxhardened_in_community_repo_a_grsecurity/))*
+  * On Alpine Linux only: `apk add coreutils`
+* Python 3.4+
 * OpenSSL
 
-
 ## Usage
-**Check out the [porting guide](https://github.com/postmarketOS/pmbootstrap/wiki/Porting-to-a-new-device) for a practical start!**
 
-**Porting progess: Wiki/[Devices](https://github.com/postmarketOS/pmbootstrap/wiki/Devices)**
+Assuming you have a supported device, you can build and flash a postmarketOS image by running through the following steps. For new devices check the [porting guide](https://wiki.postmarketos.org/wiki/Porting_to_a_new_device).
 
-Run `./pmbootstrap.py init` first, to select a target device and the work folder, which will contain all the chroots and other data.
-After that, you can run any command. All dependencies (e.g. chroots) will be installed automatically, if they are not available yet.
+First, clone the git repository and initialize your pmbootstrap environment:
 
-Here are some examples:
+```shell
+$ git clone https://github.com/postmarketOS/pmbootstrap
+$ cd pmbootstrap
+$ ./pmbootstrap.py init
+```
 
+While running any pmbootstrap command, it's always useful to have a log open in a separate window where further details can be seen:
 
-`./pmbootstrap.py --help`:
-List all available commands
+```shell
+$ ./pmbootstrap.py log
+```
 
-`./pmbootstrap.py log`:
-Run tail -f on the logfile, which contains detailed output. Do this in a second terminal, while executing another `pmbootstrap` command to get all the details.
+It's now time to run a full build which will create the boot and system images:
 
-`./pmbootstrap.py chroot`:
-Open a shell inside a native Alpine Linux chroot (~6 MB install size).
+```shell
+$ ./pmbootstrap.py install
+```
 
-`./pmbootstrap.py chroot --suffix=buildroot_armhf`:
-Open a shell inside an `armhf` Alpine Linux chroot, with qemu user mode emulation and binfmt support automatically set up.
+Once your device is connected and is ready to be flashed (e.g. via fastboot), you can run a flash of the kernel (boot) and system partitions:
 
-`./pmbootstrap.py build heimdall`:
-Build the "heimdall" package (specify any package from the `aports`-folder here).
+```shell
+$ ./pmbootstrap.py flasher flash_kernel
+$ ./pmbootstrap.py flasher flash_system
+```
 
-`./pmbootstrap.py build heimdall --arch=armhf`:
-Build the "heimdall" package for `armhf` inside the `armhf` chroot, with the cross-compiler installed in the native chroot (chroots are connected via distcc).
+After a reboot, the device will prompt for the full-disk encryption password, which you typed in the install step (unless you have disabled full-disk encryption with `--no-fde`). Once the partition has been unlocked it is possible to connect via SSH:
 
-`./pmbootstrap.py install`:
-Generate a system image file with a full postmarketOS installation. All required packages get built first, if they do not exist yet. You will get asked for the "user" password and the root partition password.
+```shell
+$ dhclient -v enp0s20f0u1
+$ ssh user@172.16.42.1
+```
 
-`./pmbootstrap.py install --sdcard=/dev/mmcblk0`:
-Format and partition the SD card `/dev/mmcblk0`, and put a full postmarketOS installation on it
+## Development
 
+### Testing
 
-## Testsuite
-Simply install `pytest` (via your package manager or via pip) and run it inside the pmbootstrap folder.
+Install `pytest` (via your package manager or pip) and run it inside the pmbootstrap folder.
 
+## License
+
+[GPLv3](LICENSE)

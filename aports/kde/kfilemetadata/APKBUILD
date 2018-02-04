@@ -1,0 +1,38 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=kfilemetadata
+pkgver=5.42.0
+pkgrel=0
+pkgdesc="A library for extracting file metadata"
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="LGPL-3.0"
+depends=""
+depends_dev="ki18n-dev karchive-dev"
+makedepends="$depends_dev extra-cmake-modules qt5-qttools-dev attr-dev doxygen ffmpeg-dev
+			exiv2-dev taglib-dev"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+options="!check" # armhf problems
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib \
+		-DBUILD_QCH=ON
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="496876dde432e0884b883e112daaa11c2fe85d2a97bde2124b04571e4f9d1516cc81ef1d80eb3043a5d43f2febe79481f1a2c299ee9e96883342f8563002c62f  kfilemetadata-5.42.0.tar.xz"

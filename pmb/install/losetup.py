@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -19,6 +19,7 @@ along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 import glob
 import json
 import logging
+import os
 
 import pmb.helpers.mount
 import pmb.helpers.run
@@ -26,8 +27,10 @@ import pmb.chroot
 
 
 def init(args):
-    pmb.helpers.run.root(args, ["modprobe", "loop"])
-    for loopdev in glob.glob("/dev/loop*"):
+    if not os.path.isdir("/sys/module/loop"):
+        pmb.helpers.run.root(args, ["modprobe", "loop"])
+    loopdevices = [loopdev for loopdev in glob.glob("/dev/loop*") if not os.path.isdir(loopdev)]
+    for loopdev in loopdevices:
         pmb.helpers.mount.bind_blockdevice(args, loopdev,
                                            args.work + "/chroot_native/" + loopdev)
 

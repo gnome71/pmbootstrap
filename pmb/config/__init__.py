@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -16,27 +16,37 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 """
+import multiprocessing
 import os
 
 #
 # Exported functions
 #
-from pmb.config.init import init
 from pmb.config.load import load
 from pmb.config.save import save
+from pmb.config.merge_with_args import merge_with_args
 
 
 #
 # Exported variables (internal configuration)
 #
-version = "0.1.0"
+version = "0.5.0"
 pmb_src = os.path.normpath(os.path.realpath(__file__) + "/../../..")
 apk_keys_path = pmb_src + "/keys"
 
 # Update this frequently to prevent a MITM attack with an outdated version
-# (which may contain a vulnerable apk/libressl, and allows and attacker to
+# (which may contain a vulnerable apk/libressl, and allows an attacker to
 # exploit the system!)
-apk_tools_static_min_version = "2.7.1-r0"
+apk_tools_static_min_version = "2.9.0-r0"
+
+# Version of the work folder (as asked during 'pmbootstrap init'). Increase
+# this number, whenever migration is required and provide the migration code,
+# see migrate_work_folder()).
+work_version = "1"
+
+# Only save keys to the config file, which we ask for in 'pmbootstrap init'.
+config_keys = ["ccache_size", "device", "extra_packages", "jobs", "keymap",
+               "qemu_native_mesa_driver", "timezone", "ui", "user", "work"]
 
 # Config file/commandline default values
 # $WORK gets replaced with the actual value for args.work (which may be
@@ -44,16 +54,28 @@ apk_tools_static_min_version = "2.7.1-r0"
 defaults = {
     "alpine_version": "edge",  # alternatively: latest-stable
     "aports": os.path.normpath(pmb_src + "/aports"),
-    "config": os.path.expanduser("~") + "/.config/pmbootstrap.cfg",
-    "device": "samsung-i9100",
-    "log": "$WORK/log.txt",
-    "mirror_alpine": "https://nl.alpinelinux.org/alpine/",
-    "work": os.path.expanduser("~") + "/.local/var/pmbootstrap",
-    "port_distccd": "33632",
-
+    "ccache_size": "5G",
     # aes-xts-plain64 would be better, but this is not supported on LineageOS
     # kernel configs
-    "cipher": "aes-cbc-plain64"
+    "cipher": "aes-cbc-plain64",
+    "config": os.path.expanduser("~") + "/.config/pmbootstrap.cfg",
+    "device": "samsung-i9100",
+    "extra_packages": "none",
+    # A higher value is typically desired, but this can lead to VERY long open
+    # times on slower devices due to host systems being MUCH faster than the
+    # target device: <https://github.com/postmarketOS/pmbootstrap/issues/429>
+    "iter_time": "200",
+    "jobs": str(multiprocessing.cpu_count() + 1),
+    "keymap": "",
+    "log": "$WORK/log.txt",
+    "mirror_alpine": "http://dl-cdn.alpinelinux.org/alpine/",
+    "mirror_postmarketos": "http://postmarketos.brixit.nl",
+    "port_distccd": "33632",
+    "qemu_native_mesa_driver": "dri-virtio",
+    "timezone": "GMT",
+    "ui": "weston",
+    "user": "user",
+    "work": os.path.expanduser("~") + "/.local/var/pmbootstrap",
 }
 
 #
@@ -86,12 +108,21 @@ chroot_host_path = os.environ["PATH"] + ":/usr/sbin/"
 chroot_mount_bind = {
     "/proc": "/proc",
     "$WORK/cache_apk_$ARCH": "/var/cache/apk",
-    "$WORK/cache_ccache_$ARCH": "/home/user/.ccache",
+    "$WORK/cache_ccache_$ARCH": "/mnt/pmbootstrap-ccache",
     "$WORK/cache_distfiles": "/var/cache/distfiles",
-    "$WORK/cache_git": "/home/user/git",
-    "$WORK/config_abuild": "/home/user/.abuild",
+    "$WORK/cache_git": "/mnt/pmbootstrap-git",
+    "$WORK/config_abuild": "/mnt/pmbootstrap-abuild-config",
     "$WORK/config_apk_keys": "/etc/apk/keys",
-    "$WORK/packages": "/home/user/packages/user",
+    "$WORK/packages": "/mnt/pmbootstrap-packages",
+}
+
+# Building chroots (all chroots, except for the rootfs_ chroot) get symlinks in
+# the "pmos" user's home folder pointing to mountfolders from above.
+chroot_home_symlinks = {
+    "/mnt/pmbootstrap-abuild-config": "/home/pmos/.abuild",
+    "/mnt/pmbootstrap-ccache": "/home/pmos/.ccache",
+    "/mnt/pmbootstrap-git": "/home/pmos/git",
+    "/mnt/pmbootstrap-packages": "/home/pmos/packages/pmos",
 }
 
 # The package alpine-base only creates some device nodes. Specify here, which
@@ -104,26 +135,53 @@ chroot_device_nodes = [
     [644, "c", 1, 9, "urandom"],
 ]
 
+# Age in hours that we keep the APKINDEXes before downloading them again.
+# You can force-update them with 'pmbootstrap update'.
+apkindex_retention_time = 4
 
 #
 # BUILD
 #
+# Officially supported host/target architectures for postmarketOS. Only
+# specify architectures supported by Alpine here. Fro cross-compiling,
+# we need to generate the "musl-$ARCH", "binutils-$ARCH" and "gcc-$ARCH"
+# packages (use "pmbootstrap aportgen musl-armhf" etc.).
+build_device_architectures = ["armhf", "aarch64", "x86_64", "x86"]
 
-# Packages, that will be installed in a chroot before it build packages
+# Packages, that will be installed in a chroot before it builds packages
 # for the first time
 build_packages = ["abuild", "build-base", "ccache"]
 
 # fnmatch for supported pkgnames, that can be directly compiled inside
 # the native chroot and a cross-compiler, without using distcc
-build_cross_native = ["linux-*"]
+build_cross_native = ["linux-*", "arch-bin-masquerade"]
+
+# Necessary kernel config options
+necessary_kconfig_options = {
+    "ANDROID_PARANOID_NETWORK": False,
+    "DEVTMPFS": True,
+    "DEVTMPFS_MOUNT": False,
+    "DM_CRYPT": True,
+    "EXT4_FS": True,
+    "PFT": False,
+    "SYSVIPC": True,
+    "VT": True
+}
+
+
+#
+# PARSE
+#
 
 # Variables in APKBUILD files, that get parsed
 apkbuild_attributes = {
     "arch": {"array": True},
     "depends": {"array": True},
+    "depends_dev": {"array": True},
     "makedepends": {"array": True},
     "options": {"array": True},
     "pkgname": {"array": False},
+    "pkgdesc": {"array": False},
     "pkgrel": {"array": False},
     "pkgver": {"array": False},
     "subpackages": {"array": True},
@@ -136,11 +194,70 @@ apkbuild_attributes = {
     "_flavor": {"array": False},
     "_device": {"array": False},
     "_kernver": {"array": False},
-    "_pmb_build_in_native_chroot": {"array": False},
 
     # mesa
     "_llvmver": {"array": False},
+
+    # Overridden packages
+    "_pkgver": {"array": False},
 }
+
+# Variables from deviceinfo. Reference: <https://postmarketos.org/deviceinfo>
+deviceinfo_attributes = [
+    # general
+    "format_version",
+    "name",
+    "manufacturer",
+    "date",
+    "dtb",
+    "modules_initfs",
+    "external_disk_install",
+    "arch",
+    "nonfree",
+
+    # device
+    "keyboard",
+    "external_disk",
+    "screen_width",
+    "screen_height",
+    "dev_touchscreen",
+    "dev_touchscreen_calibration",
+    "dev_keyboard",
+
+    # bootloader
+    "flash_method",
+
+    # flash
+    "flash_heimdall_partition_kernel",
+    "flash_heimdall_partition_initfs",
+    "flash_heimdall_partition_system",
+    "generate_legacy_uboot_initfs",
+    "kernel_cmdline",
+    "generate_bootimg",
+    "bootimg_qcdt",
+    "flash_offset_base",
+    "flash_offset_kernel",
+    "flash_offset_ramdisk",
+    "flash_offset_second",
+    "flash_offset_tags",
+    "flash_pagesize",
+    "flash_fastboot_max_size",
+    "flash_fastboot_vendor_id",
+    "flash_sparse",
+
+    # weston
+    "weston_pixman_type",
+
+    # keymaps
+    "keymaps",
+]
+
+#
+# INITFS
+#
+initfs_hook_prefix = "postmarketos-mkinitfs-hook-"
+default_ip = "172.16.42.1"
+
 
 #
 # INSTALL
@@ -153,71 +270,98 @@ install_native_packages = ["cryptsetup", "util-linux", "e2fsprogs", "parted"]
 install_device_packages = [
 
     # postmarketos
-    "postmarketos-base", "postmarketos-demos",
-
-    # weston
-    "weston", "weston-shell-desktop", "weston-backend-fbdev", "weston-backend-drm",
-    "weston-backend-x11", "weston-clients", "weston-terminal",
-    "weston-xwayland", "xorg-server-xwayland",
+    "postmarketos-base",
 
     # other
     "ttf-droid"
 ]
-install_size_image = "835M"
-install_size_boot = "100M"
-
-# fnmatch-patterns, that the sdcard patch must match. Otherwise the
-# installer will refuse to format the device.
-install_valid_sdcard_devices = ["/dev/mmcblk*", "/dev/loop*"]
 
 
 #
 # FLASH
 #
 
+flash_methods = ["fastboot", "heimdall", "0xffff", "none"]
+
 # These folders will be mounted at the same location into the native
 # chroot, before the flash programs get started.
 flash_mount_bind = [
     "/sys/bus/usb/devices/",
+    "/sys/dev/",
     "/sys/devices/",
     "/dev/bus/usb/"
 ]
 
-# Allowed variables:
-# $KERNEL, $RAMDISK, $IMAGE (system partition image), $BOOTPARAM
+"""
+Flasher abstraction. Allowed variables:
+
+$BOOT: Path to the /boot partition
+$FLAVOR: Kernel flavor
+$IMAGE: Path to the system partition image
+$PARTITION_SYSTEM: Partition to flash the system image
+
+Fastboot specific: $KERNEL_CMDLINE, $VENDOR_ID
+Heimdall specific: $PARTITION_KERNEL, $PARTITION_INITFS
+"""
 flashers = {
     "fastboot": {
         "depends": ["android-tools"],
         "actions":
                 {
-                    "list_devices": [["fastboot", "devices", "-l"]],
-            "flash_system": [["fastboot", "flash", "system", "$IMAGE"]],
-            "flash_kernel": [["fastboot",
-                              "--base", "$OFFSET_BASE",
-                              "--kernel-offset", "$OFFSET_KERNEL",
-                              "--ramdisk-offset", "$OFFSET_RAMDISK",
-                              "--tags-offset", "$OFFSET_TAGS",
-                              "--page-size", "$PAGE_SIZE",
-                              "flash:raw", "$KERNEL", "$RAMDISK"]],
-            "boot": [["fastboot",
-                      "--base", "$OFFSET_BASE",
-                      "--kernel-offset", "$OFFSET_KERNEL",
-                      "--ramdisk-offset", "$OFFSET_RAMDISK",
-                      "--tags-offset", "$OFFSET_TAGS",
-                      "--page-size", "$PAGE_SIZE",
-                      "boot", "$KERNEL", "$RAMDISK"]],
-        }
+                    "list_devices": [["fastboot", "-i", "$VENDOR_ID",
+                                      "devices", "-l"]],
+                    "flash_system": [["fastboot", "-i", "$VENDOR_ID",
+                                      "flash", "$PARTITION_SYSTEM", "$IMAGE"]],
+                    "flash_kernel": [["fastboot", "-i", "$VENDOR_ID",
+                                      "flash", "boot", "$BOOT/boot.img-$FLAVOR"]],
+                    "boot": [["fastboot", "-i", "$VENDOR_ID",
+                              "-c", "$KERNEL_CMDLINE", "boot",
+                              "$BOOT/boot.img-$FLAVOR"]],
+        },
     },
-    "heimdall": {
+    # Some Samsung devices need the initramfs to be baked into the kernel (e.g.
+    # i9070, i9100). We want the initramfs to be generated after the kernel was
+    # built, so we put the real initramfs on another partition (e.g. RECOVERY)
+    # and load it from the initramfs in the kernel. This method is called
+    # "isorec" (isolated recovery), a term coined by Lanchon.
+    "heimdall-isorec": {
         "depends": ["heimdall"],
         "actions":
-                {
-                    "list_devices": [["heimdall", "detect"]],
+        {
+            "list_devices": [["heimdall", "detect"]],
             "flash_system": [
-                        ["heimdall_wait_for_device.sh"],
-                        ["heimdall", "flash", "--SYSTEM", "$IMAGE"]],
-            "flash_kernel": [["heimdall_flash_kernel.sh", "$RAMDISK", "$KERNEL"]]
+                ["heimdall_wait_for_device.sh"],
+                ["heimdall", "flash", "--$PARTITION_SYSTEM", "$IMAGE"]],
+            "flash_kernel": [["heimdall_flash_kernel.sh",
+                              "$BOOT/initramfs-$FLAVOR", "$PARTITION_INITFS",
+                              "$BOOT/vmlinuz-$FLAVOR", "$PARTITION_KERNEL"]]
         },
+    },
+    # Some Samsung devices need a 'boot.img' file, just like the one generated
+    # fastboot compatible devices. Example: s7562, n7100
+    "heimdall-bootimg": {
+        "depends": ["heimdall"],
+        "actions":
+        {
+            "list_devices": [["heimdall", "detect"]],
+            "flash_system": [
+                ["heimdall_wait_for_device.sh"],
+                ["heimdall", "flash", "--$PARTITION_SYSTEM", "$IMAGE"]],
+            "flash_kernel": [
+                ["heimdall_wait_for_device.sh"],
+                ["heimdall", "flash", "--$PARTITION_KERNEL", "$BOOT/boot.img-$FLAVOR"]],
+        },
+    },
+    "adb": {
+            "depends": ["android-tools"],
+            "actions":
+            {
+                "list_devices": [["adb", "-P", "5038", "devices"]],
+                "sideload": [["echo", "< wait for any device >"],
+                             ["adb", "-P", "5038", "wait-for-usb-sideload"],
+                             ["adb", "-P", "5038", "sideload",
+                              "$RECOVERY_ZIP"]],
+            }
     },
 }
 
@@ -228,3 +372,23 @@ git_repos = {
     "aports_upstream": "https://github.com/alpinelinux/aports",
     "apk-tools": "https://github.com/alpinelinux/apk-tools",
 }
+
+
+#
+# APORTGEN
+#
+aportgen = {
+    "cross": {
+        "prefixes": ["binutils", "busybox-static", "gcc", "musl"],
+        "confirm_overwrite": False,
+    },
+    "device": {
+        "prefixes": ["device", "linux"],
+        "confirm_overwrite": True,
+    }
+}
+
+#
+# QEMU
+#
+qemu_native_mesa_drivers = ["dri-swrast", "dri-virtio"]

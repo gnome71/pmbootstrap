@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -20,9 +20,13 @@ import os
 import logging
 import glob
 
+import pmb.build.other
 import pmb.chroot
+import pmb.helpers.file
+import pmb.helpers.git
 import pmb.helpers.run
 import pmb.parse.apkindex
+import pmb.parse.version
 
 
 def find_aport(args, package, must_exist=True):
@@ -32,122 +36,146 @@ def find_aport(args, package, must_exist=True):
     :param must_exist: Raise an exception, when not found
     :returns: the full path to the aport folder
     """
-    path = args.aports + "/" + package
-    if os.path.exists(path):
-        return path
+    # Try to get a cached result first (we assume, that the aports don't change
+    # in one pmbootstrap call)
+    ret = None
+    if package in args.cache["find_aport"]:
+        ret = args.cache["find_aport"][package]
+    else:
+        # Sanity check
+        if "*" in package:
+            raise RuntimeError("Invalid pkgname: " + package)
 
-    for path_current in glob.glob(args.aports + "/*/APKBUILD"):
-        apkbuild = pmb.parse.apkbuild(path_current)
-        if package in apkbuild["subpackages"]:
-            return os.path.dirname(path_current)
-    if must_exist:
+        # Search in packages
+        paths = glob.glob(args.aports + "/*/" + package)
+        if len(paths) > 2:
+            raise RuntimeError("Package " + package + " found in multiple"
+                               " aports subfolders. Please put it only in one"
+                               " folder.")
+        elif len(paths) == 1:
+            ret = paths[0]
+        else:
+            # Search in subpackages
+            for path_current in glob.glob(args.aports + "/*/*/APKBUILD"):
+                apkbuild = pmb.parse.apkbuild(args, path_current)
+                if package in apkbuild["subpackages"]:
+                    ret = os.path.dirname(path_current)
+                    break
+
+    # Crash when necessary
+    if ret is None and must_exist:
         raise RuntimeError("Could not find aport for package: " +
                            package)
-    return None
+
+    # Save result in cache
+    args.cache["find_aport"][package] = ret
+    return ret
 
 
 def copy_to_buildpath(args, package, suffix="native"):
     # Sanity check
-    aport = args.aports + "/" + package
+    aport = find_aport(args, package)
     if not os.path.exists(aport + "/APKBUILD"):
         raise ValueError("Path does not contain an APKBUILD file:" +
                          aport)
 
     # Clean up folder
-    build = args.work + "/chroot_" + suffix + "/home/user/build"
+    build = args.work + "/chroot_" + suffix + "/home/pmos/build"
     if os.path.exists(build):
-        pmb.chroot.root(args, ["rm", "-rf", "/home/user/build"],
+        pmb.chroot.root(args, ["rm", "-rf", "/home/pmos/build"],
                         suffix=suffix)
 
     # Copy aport contents
     pmb.helpers.run.root(args, ["cp", "-r", aport + "/", build])
-    pmb.chroot.root(args, ["chown", "-R", "user:user",
-                           "/home/user/build"], suffix=suffix)
+    pmb.chroot.root(args, ["chown", "-R", "pmos:pmos",
+                           "/home/pmos/build"], suffix=suffix)
 
 
-def is_necessary(args, suffix, carch, apkbuild):
+def is_necessary(args, arch, apkbuild, apkindex_path=None):
     """
-    Check if the package has already been built (because abuild's check
-    only works, if it is the same architecture!)
+    Check if the package has already been built. Compared to abuild's check,
+    this check also works for different architectures, and it recognizes
+    changed files in an aport folder, even if the pkgver and pkgrel did not
+    change.
 
-    :param apkbuild: From pmb.parse.apkbuild()
-    :returns: Boolean
+    :param arch: package target architecture
+    :param apkbuild: from pmb.parse.apkbuild()
+    :param apkindex_path: override the APKINDEX.tar.gz path
+    :returns: boolean
     """
-
-    # Get new version from APKBUILD
+    # Get package name, version, define start of debug message
     package = apkbuild["pkgname"]
     version_new = apkbuild["pkgver"] + "-r" + apkbuild["pkgrel"]
+    msg = "Build is necessary for package '" + package + "': "
 
     # Get old version from APKINDEX
-    version_old = None
-    index_data = pmb.parse.apkindex.read(args, package,
-                                         args.work + "/packages/" + carch + "/APKINDEX.tar.gz", False)
-    if index_data:
-        version_old = index_data["version"]
+    if apkindex_path:
+        index_data = pmb.parse.apkindex.read(
+            args, package, apkindex_path, False)
+    else:
+        index_data = pmb.parse.apkindex.read_any_index(args, package, arch)
+    if not index_data:
+        logging.debug(msg + "No binary package available")
+        return True
 
-    if version_new == version_old:
+    # a) Binary repo has a newer version
+    version_old = index_data["version"]
+    if pmb.parse.version.compare(version_old, version_new) == 1:
+        logging.warning("WARNING: Package '" + package + "' in your aports folder"
+                        " has version " + version_new + ", but the binary package"
+                        " repositories already have version " + version_old + "!"
+                        " See also: <https://postmarketos.org/warning-repo2>")
         return False
-    if pmb.parse.apkindex.compare_version(version_old,
-                                          version_new) == 1:
-        logging.warning("WARNING: Package " + package + "-" + version_old +
-                        " in your binary repository is higher than the version defined" +
-                        " in the APKBUILD. Consider cleaning your package cache" +
-                        " (pmbootstrap zap -p) or removing that file and running" +
-                        " 'pmbootstrap index'!")
-        return False
-    return True
 
-# When arch is not defined, reindex all repos
+    # b) Aports folder has a newer version
+    if version_new != version_old:
+        logging.debug(msg + "Binary package out of date (binary: " + version_old +
+                      ", aport: " + version_new + ")")
+        return True
+
+    # Aports and binary repo have the same version.
+    return False
 
 
 def index_repo(args, arch=None):
+    """
+    Recreate the APKINDEX.tar.gz for a specific repo, and clear the parsing
+    cache for that file for the current pmbootstrap session (to prevent
+    rebuilding packages twice, in case the rebuild takes less than a second).
+
+    :param arch: when not defined, re-index all repos
+    """
+    pmb.build.init(args)
+
     if arch:
         paths = [args.work + "/packages/" + arch]
     else:
         paths = glob.glob(args.work + "/packages/*")
 
     for path in paths:
-        path_arch = os.path.basename(path)
-        path_repo_chroot = "/home/user/packages/user/" + path_arch
-        logging.info("(native) index " + path_arch + " repository")
-        commands = [
-            ["apk", "index", "--output", "APKINDEX.tar.gz_",
-             "--rewrite-arch", path_arch, "*.apk"],
-            ["abuild-sign", "APKINDEX.tar.gz_"],
-            ["mv", "APKINDEX.tar.gz_", "APKINDEX.tar.gz"]
-        ]
-        for command in commands:
-            pmb.chroot.user(args, command, working_dir=path_repo_chroot)
+        if os.path.isdir(path):
+            path_arch = os.path.basename(path)
+            path_repo_chroot = "/home/pmos/packages/pmos/" + path_arch
+            logging.debug("(native) index " + path_arch + " repository")
+            commands = [
+                ["apk", "-q", "index", "--output", "APKINDEX.tar.gz_",
+                 "--rewrite-arch", path_arch, "*.apk"],
+                ["abuild-sign", "APKINDEX.tar.gz_"],
+                ["mv", "APKINDEX.tar.gz_", "APKINDEX.tar.gz"]
+            ]
+            for command in commands:
+                pmb.chroot.user(args, command, working_dir=path_repo_chroot)
+        else:
+            logging.debug("NOTE: Can't build index for: " + path)
+        pmb.parse.apkindex.clear_cache(args, path + "/APKINDEX.tar.gz")
 
 
-def symlink_noarch_package(args, arch_apk):
-    """
-    :param arch_apk: for example: x86_64/mypackage-1.2.3-r0.apk
-    """
-
-    # Create the arch folder
-    device_arch = args.deviceinfo["arch"]
-    device_repo = args.work + "/packages/" + device_arch
-    if not os.path.exists(device_repo):
-        pmb.chroot.user(args, ["mkdir", "-p", "/home/user/packages/user/" +
-                               device_arch])
-
-    # Add symlink, rewrite index
-    device_repo_chroot = "/home/user/packages/user/" + device_arch
-    pmb.chroot.user(args, ["ln", "-sf", "../" + arch_apk, "."],
-                    working_dir=device_repo_chroot)
-    index_repo(args, device_arch)
-
-
-def ccache_stats(args, arch):
-    suffix = "native"
-    if args.arch:
-        suffix = "buildroot_" + arch
-    pmb.chroot.user(args, ["ccache", "-s"], suffix, log=False)
-
-
-# set the correct JOBS count in abuild.conf
 def configure_abuild(args, suffix, verify=False):
+    """
+    Set the correct JOBS count in abuild.conf
+
+    :param verify: internally used to test if changing the config has worked.
+    """
     path = args.work + "/chroot_" + suffix + "/etc/abuild.conf"
     prefix = "export JOBS="
     with open(path, encoding="utf-8") as handle:
@@ -164,3 +192,27 @@ def configure_abuild(args, suffix, verify=False):
                 configure_abuild(args, suffix, True)
             return
     raise RuntimeError("Could not find " + prefix + " line in " + path)
+
+
+def configure_ccache(args, suffix="native", verify=False):
+    """
+    Set the maximum ccache size
+
+    :param verify: internally used to test if changing the config has worked.
+    """
+    # Check if the settings have been set already
+    arch = pmb.parse.arch.from_chroot_suffix(args, suffix)
+    path = args.work + "/cache_ccache_" + arch + "/ccache.conf"
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                if line == ("max_size = " + args.ccache_size + "\n"):
+                    return
+    if verify:
+        raise RuntimeError("Failed to configure ccache: " + path + "\nTry to"
+                           " delete the file (or zap the chroot).")
+
+    # Set the size and verify
+    pmb.chroot.user(args, ["ccache", "--max-size", args.ccache_size],
+                    suffix)
+    configure_ccache(args, suffix, True)

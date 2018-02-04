@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -62,7 +62,9 @@ def rewrite(args, pkgname, path_original, fields={}, replace_pkgname=None,
         "\n",
     ]
     for line in below_header.split("\n"):
-        lines_new += line.strip() + "\n"
+        if not line[:8].strip():
+            line = line[8:]
+        lines_new += line.rstrip() + "\n"
 
     # Copy/modify lines, skip Maintainer/Contributor
     path = args.work + "/aportgen/APKBUILD"

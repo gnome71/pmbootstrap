@@ -1,0 +1,37 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=kservice
+pkgver=5.42.0
+pkgrel=0
+pkgdesc='Advanced plugin and service introspection'
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="LGPL-2.1"
+depends=""
+depends_dev="kcrash-dev kconfig-dev kdbusaddons-dev ki18n-dev kcoreaddons-dev"
+makedepends="$depends_dev extra-cmake-modules kdoctools-dev doxygen qt5-qttools-dev flex-dev bison"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+options="!check" # Fails due to test suites not building
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib \
+		-DBUILD_QCH=ON \
+		-DBUILD_TESTING=OFF
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+
+sha512sums="dccc59a5638fcce3c73e358baef0632cf089280f85551e712901a281410146b2127d1dde7a8d9ffac44ad8458cad3b2eb89e667ed73d351d27cac9e2e4ca4be7  kservice-5.42.0.tar.xz"

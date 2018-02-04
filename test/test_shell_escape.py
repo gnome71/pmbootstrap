@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -21,11 +21,12 @@ import sys
 import pytest
 
 # Import from parent directory
-pmb_src = os.path.abspath(os.path.join(os.path.dirname(__file__) + "/.."))
+pmb_src = os.path.realpath(os.path.join(os.path.dirname(__file__) + "/.."))
 sys.path.append(pmb_src)
-import pmb.helpers.run
 import pmb.chroot.root
 import pmb.chroot.user
+import pmb.helpers.run
+import pmb.helpers.logging
 
 
 @pytest.fixture
@@ -33,7 +34,8 @@ def args(request):
     import pmb.parse
     sys.argv = ["pmbootstrap.py", "chroot"]
     args = pmb.parse.arguments()
-    setattr(args, "logfd", open("/dev/null", "a+"))
+    args.log = args.work + "/log_testsuite.txt"
+    pmb.helpers.logging.init(args)
     request.addfinalizer(args.logfd.close)
     return args
 

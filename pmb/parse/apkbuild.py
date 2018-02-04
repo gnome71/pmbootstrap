@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -16,7 +16,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 """
+import os
+import logging
 import pmb.config
+import pmb.parse.version
 
 
 def replace_variables(apkbuild):
@@ -37,7 +40,7 @@ def replace_variables(apkbuild):
         replaced.append(subpackage.replace("$pkgname", ret["pkgname"]))
     ret["subpackages"] = replaced
 
-    # makedepend: $makedepends_host, $makedepends_build, $_llvmver
+    # makedepends: $makedepends_host, $makedepends_build, $_llvmver
     replaced = []
     for makedepend in ret["makedepends"]:
         if makedepend.startswith("$"):
@@ -53,6 +56,15 @@ def replace_variables(apkbuild):
             for var in ["_llvmver"]:
                 makedepend = makedepend.replace("$" + var, ret[var])
             replaced += [makedepend]
+
+    # Python: ${pkgname#py-}
+    if ret["pkgname"].startswith("py-"):
+        replacement = ret["pkgname"][3:]
+        for var in ["depends", "makedepends", "subpackages"]:
+            for i in range(len(ret[var])):
+                ret[var][i] = ret[var][i].replace(
+                    "${pkgname#py-}", replacement)
+
     ret["makedepends"] = replaced
     return ret
 
@@ -69,19 +81,28 @@ def cut_off_function_names(apkbuild):
     return apkbuild
 
 
-def apkbuild(path):
+def apkbuild(args, path, check_pkgver=True):
     """
     Parse relevant information out of the APKBUILD file. This is not meant
     to be perfect and catch every edge case (for that, a full shell parser
     would be necessary!). Instead, it should just work with the use-cases
     covered by pmbootstrap and not take too long.
 
-    :param path: Full path to the APKBUILD
-    :returns: Relevant variables from the APKBUILD. Arrays get returned as
-        arrays.
+    :param path: full path to the APKBUILD
+    :param version_check: verify that the pkgver is valid.
+    :returns: relevant variables from the APKBUILD. Arrays get returned as
+              arrays.
     """
+    # Try to get a cached result first (we assume, that the aports don't change
+    # in one pmbootstrap call)
+    if path in args.cache["apkbuild"]:
+        return args.cache["apkbuild"][path]
+
+    # Read the file and check line endings
     with open(path, encoding="utf-8") as handle:
         lines = handle.readlines()
+        if handle.newlines != '\n':
+            raise RuntimeError("Wrong line endings in APKBUILD: " + path)
 
     # Parse all attributes from the config
     ret = {}
@@ -96,10 +117,15 @@ def apkbuild(path):
             if line_value.startswith("\""):
                 end_char = "\""
             value = ""
+            first_line = i
             while i < len(lines) - 1:
                 value += line_value.replace("\"", "").strip()
-                if not end_char or line_value.endswith(end_char):
+                if not end_char:
                     break
+                elif line_value.endswith(end_char):
+                    # This check is needed to allow line break directly after opening quote
+                    if i != first_line or line_value.count(end_char) > 1:
+                        break
                 value += " "
                 i += 1
                 line_value = lines[i][:-1]
@@ -112,7 +138,7 @@ def apkbuild(path):
                     value = []
             ret[attribute] = value
 
-    # Add missing entries
+    # Add missing keys
     for attribute, options in pmb.config.apkbuild_attributes.items():
         if attribute not in ret:
             if options["array"]:
@@ -120,6 +146,30 @@ def apkbuild(path):
             else:
                 ret[attribute] = ""
 
+    # Properly format values
     ret = replace_variables(ret)
     ret = cut_off_function_names(ret)
+
+    # Sanity check: pkgname
+    suffix = "/" + ret["pkgname"] + "/APKBUILD"
+    if not os.path.realpath(path).endswith(suffix):
+        logging.info("Folder: '" + os.path.dirname(path) + "'")
+        logging.info("Pkgname: '" + ret["pkgname"] + "'")
+        raise RuntimeError("The pkgname must be equal to the name of"
+                           " the folder, that contains the APKBUILD!")
+
+    # Sanity check: arch
+    if not len(ret["arch"]):
+        raise RuntimeError("Arch must not be empty: " + path)
+
+    # Sanity check: pkgver
+    if check_pkgver:
+        if "-r" in ret["pkgver"] or not pmb.parse.version.validate(ret["pkgver"]):
+            logging.info("NOTE: Valid pkgvers are described here:")
+            logging.info("<https://wiki.alpinelinux.org/wiki/APKBUILD_Reference#pkgver>")
+            raise RuntimeError("Invalid pkgver '" + ret["pkgver"] +
+                               "' in APKBUILD: " + path)
+
+    # Fill cache
+    args.cache["apkbuild"][path] = ret
     return ret

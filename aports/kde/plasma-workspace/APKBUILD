@@ -1,0 +1,52 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=plasma-workspace
+pkgver=5.11.5
+pkgrel=0
+pkgdesc='KDE Plasma Workspace'
+arch="all"
+url='https://www.kde.org/workspaces/plasmadesktop/'
+license="GPL-2.0"
+depends="kwin iso-codes qt5-qtwayland kactivitymanagerd kinit milou consolekit2"
+depends_dev="krunner-dev kdesignerplugin-dev kdesignerplugin qt5-qtwayland-dev qt5-qtdeclarative-dev
+			kxmlrpcclient-dev kdelibs4support-dev plasma-framework-dev knotifyconfig-dev
+			kcmutils-dev kdesu-dev kwallet-dev ksysguard kwin-dev kguiaddons-dev
+			kjsembed-dev knewstuff-dev qt5-x11extras-dev ktexteditor-dev libksysguard-dev
+			kwallet-dev attica-qt-dev kitemmodels-dev kscreenlocker-dev
+			qt5-qtscript-dev karchive-dev kcrash-dev kpackage-dev kactivities-dev
+			kdeclarative-dev kpty-dev kjs-dev ktextwidgets-dev sonnet-dev kauth-dev
+			kconfigwidgets-dev ki18n-dev kcodecs-dev kwidgetsaddons-dev kservice-dev
+			kxmlgui-dev kwindowsystem-dev kcoreaddons-dev kconfig-dev kemoticons-dev
+			kiconthemes-dev kinit-dev knotifications-dev kio-dev kbookmarks-dev kparts-dev
+			kcompletion-dev kitemviews-dev kjobwidgets-dev solid-dev kunitconversion-dev
+			kdbusaddons-dev kidletime-dev kglobalaccel-dev phonon-qt5-dev kwayland-dev
+			baloo-dev prison-dev"
+makedepends="$depends_dev extra-cmake-modules kdoctools-dev gpsd iso-codes-dev libxtst-dev
+			xcb-util-image-dev libxrender-dev"
+source="https://download.kde.org/stable/plasma/${pkgver}/$pkgname-$pkgver.tar.xz
+		dont-set-brightness-to-one.patch"
+subpackages="$pkgname-dev $pkgname-libs $pkgname-doc $pkgname-lang"
+options="!check" # Fails due to requiring running X11
+
+build() {
+	cmake \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DKDE_INSTALL_LIBDIR=lib \
+		-DKDE_INSTALL_LIBEXECDIR=lib
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install
+
+	install -Dm644 plasmawayland.desktop "$pkgdir"/usr/share/wayland-sessions/plasmawayland.desktop
+}
+sha512sums="6f15e529665a5fbe24ee0420d1c8fe96ff97dbd2788ae120cd1834889b307b5979ca2aedd4f97d3cadcc7ed5cdb06c0e5f9c704ec732468db4b8ecf89270826f  plasma-workspace-5.11.5.tar.xz
+444cfb650bfabdd1555b1be01fcdb47dacfeada6bd258d2870cb2e90af4ca4b379e311502d0527a75dfdf666f2edf1e37eb811a16caaf5c7e45f80e941ec4b90  dont-set-brightness-to-one.patch"

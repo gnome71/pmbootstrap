@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -19,65 +19,105 @@ along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 import logging
 import os
 
+import pmb.config
 import pmb.flasher
 import pmb.install
+import pmb.chroot.apk
+import pmb.chroot.initfs
 import pmb.chroot.other
+import pmb.export.frontend
+import pmb.helpers.frontend
+import pmb.parse.kconfig
 
 
 def kernel(args):
-    # Parse the kernel flavor
-    suffix = "rootfs_" + args.device
-    flavor = args.flavor
-    flavors = pmb.chroot.other.installed_kernel_flavors(args, suffix)
-    if flavor:
-        if flavor not in flavors:
-            raise RuntimeError("No kernel installed with flavor " + flavor + "!" +
-                               " Run 'pmbootstrap flasher list_flavors' to get a list.")
-    elif not len(flavors):
-        raise RuntimeError(
-            "No kernel flavors installed in chroot " + suffix + "!")
-    else:
-        flavor = flavors[0]
+    # Rebuild the initramfs, just to make sure (see #69)
+    flavor = pmb.helpers.frontend._parse_flavor(args)
+    pmb.chroot.initfs.build(args, flavor, "rootfs_" + args.device)
+
+    # Check kernel config
+    pmb.parse.kconfig.check(args, flavor)
 
     # Generate the paths and run the flasher
-    pmb.flasher.init(args)
-    mnt = "/mnt/rootfs_" + args.device
-    kernel = mnt + "/boot/vmlinuz-" + flavor
-    ramdisk = mnt + "/boot/initramfs-" + flavor
     if args.action_flasher == "boot":
         logging.info("(native) boot " + flavor + " kernel")
-        pmb.flasher.run(args, "boot", kernel, ramdisk)
+        pmb.flasher.run(args, "boot", flavor)
     else:
-        logging.info("(native) flash kernel '" + flavor + "'")
-        pmb.flasher.run(args, "flash_kernel", kernel, ramdisk)
+        logging.info("(native) flash kernel " + flavor)
+        pmb.flasher.run(args, "flash_kernel", flavor)
+    logging.info("You will get an IP automatically assigned to your "
+                 "USB interface shortly.")
+    logging.info("Then you can connect to your device using ssh after pmOS has booted:")
+    logging.info("ssh {}@{}".format(args.user, pmb.config.default_ip))
+    logging.info("NOTE: If you enabled full disk encryption, you should make sure that"
+                 " osk-sdl has been properly configured for your device")
 
 
 def list_flavors(args):
     suffix = "rootfs_" + args.device
     logging.info("(" + suffix + ") installed kernel flavors:")
-    for flavor in pmb.chroot.other.installed_kernel_flavors(args, suffix):
+    for flavor in pmb.chroot.other.kernel_flavors_installed(args, suffix):
         logging.info("* " + flavor)
 
 
 def system(args):
     # Generate system image, install flasher
-    img_path = "/home/user/rootfs/" + args.device + ".img"
+    img_path = "/home/pmos/rootfs/" + args.device + ".img"
     if not os.path.exists(args.work + "/chroot_native" + img_path):
-        setattr(args, "sdcard", None)
-        pmb.install.install(args, False)
-    pmb.flasher.init(args)
+        raise RuntimeError("The system image has not been generated yet,"
+                           " please run 'pmbootstrap install' first.")
+
+    # Do not flash if using fastboot & image is too large
+    method = args.flash_method or args.deviceinfo["flash_method"]
+    if method == "fastboot" and args.deviceinfo["flash_fastboot_max_size"]:
+        img_size = os.path.getsize(args.work + "/chroot_native" + img_path) / 1024**2
+        max_size = int(args.deviceinfo["flash_fastboot_max_size"])
+        if img_size > max_size:
+            raise RuntimeError("The system image is too large for fastboot"
+                               " to flash.")
 
     # Run the flasher
     logging.info("(native) flash system image")
-    pmb.flasher.run(args, "flash_system", image=img_path)
+    pmb.flasher.run(args, "flash_system")
 
 
 def list_devices(args):
     pmb.flasher.run(args, "list_devices")
 
 
+def sideload(args):
+    method = args.flash_method or args.deviceinfo["flash_method"]
+    cfg = pmb.config.flashers[method]
+
+    # Install depends
+    pmb.chroot.apk.install(args, cfg["depends"])
+
+    # Mount the buildroot
+    suffix = "buildroot_" + args.deviceinfo["arch"]
+    mountpoint = "/mnt/" + suffix
+    pmb.helpers.mount.bind(args, args.work + "/chroot_" + suffix,
+                           args.work + "/chroot_native/" + mountpoint)
+
+    # Missing recovery zip error
+    zip_path = ("/var/lib/postmarketos-android-recovery-installer/pmos-" +
+                args.device + ".zip")
+    if not os.path.exists(args.work + "/chroot_native" + mountpoint +
+                          zip_path):
+        raise RuntimeError("The recovery zip has not been generated yet,"
+                           " please run 'pmbootstrap install' with the"
+                           " '--android-recovery-zip' parameter first!")
+
+    pmb.flasher.run(args, "sideload")
+
+
 def frontend(args):
     action = args.action_flasher
+    method = args.flash_method or args.deviceinfo["flash_method"]
+
+    if method == "none" and action in ["boot", "flash_kernel", "flash_system"]:
+        logging.info("This device doesn't support any flash method.")
+        return
+
     if action in ["boot", "flash_kernel"]:
         kernel(args)
     if action == "flash_system":
@@ -86,3 +126,10 @@ def frontend(args):
         list_flavors(args)
     if action == "list_devices":
         list_devices(args)
+    if action == "sideload":
+        sideload(args)
+    if action == "export":
+        logging.info("WARNING: 'pmbootstrap flasher export' is deprecated and"
+                     " will be removed soon. The new syntax is 'pmbootstrap"
+                     " export'.")
+        pmb.export.frontend(args)

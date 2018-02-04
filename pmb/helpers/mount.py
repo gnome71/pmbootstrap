@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -25,11 +25,13 @@ def ismount(folder):
     Ismount() implementation, that works for mount --bind.
     Workaround for: https://bugs.python.org/issue29707
     """
-    folder = os.path.abspath(folder)
+    folder = os.path.realpath(os.path.realpath(folder))
     with open("/proc/mounts", "r") as handle:
         for line in handle:
             words = line.split()
             if len(words) >= 2 and words[1] == folder:
+                return True
+            if words[0] == folder:
                 return True
     return False
 
@@ -58,10 +60,12 @@ def bind(args, source, destination, create_folders=True):
     if not ismount(destination):
         raise RuntimeError("Mount failed: " + source + " -> " + destination)
 
-# Mount a blockdevice
-
 
 def bind_blockdevice(args, source, destination):
+    """
+    Mount a blockdevice with the --bind option, and create the destination
+    file, if necessary.
+    """
     # Skip existing mountpoint
     if ismount(destination):
         return
@@ -75,16 +79,36 @@ def bind_blockdevice(args, source, destination):
                                 destination])
 
 
+def umount_all_list(prefix, source="/proc/mounts"):
+    """
+    Parses `/proc/mounts` for all folders beginning with a prefix.
+    :source: can be changed for testcases
+    :returns: a list of folders, that need to be umounted
+    """
+    ret = []
+    prefix = os.path.realpath(prefix)
+    with open(source, "r") as handle:
+        for line in handle:
+            words = line.split()
+            if len(words) < 2:
+                raise RuntimeError("Failed to parse line in " + source + ": " +
+                                   line)
+            mountpoint = words[1]
+            if mountpoint.startswith(prefix):
+                # Remove "\040(deleted)" suffix (#545)
+                deleted_str = r"\040(deleted)"
+                if mountpoint.endswith(deleted_str):
+                    mountpoint = mountpoint[:-len(deleted_str)]
+                ret.append(mountpoint)
+    ret.sort(reverse=True)
+    return ret
+
+
 def umount_all(args, folder):
     """
     Umount all folders, that are mounted inside a given folder.
     """
-    folder = os.path.abspath(folder)
-    with open("/proc/mounts", "r") as handle:
-        for line in handle:
-            words = line.split()
-            if len(words) < 2 or not words[1].startswith(folder):
-                continue
-            pmb.helpers.run.root(args, ["umount", words[1]])
-            if ismount(words[1]):
-                raise RuntimeError("Failed to umount: " + words[1])
+    for mountpoint in umount_all_list(folder):
+        pmb.helpers.run.root(args, ["umount", mountpoint])
+        if ismount(mountpoint):
+            raise RuntimeError("Failed to umount: " + mountpoint)

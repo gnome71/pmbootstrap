@@ -1,0 +1,30 @@
+# Contributor: k0r10n <k0r10n.dev@gmail.com>
+# Contributor: Ivan Tham <pickfire@riseup.net>
+pkgname=extra-cmake-modules
+pkgver=5.42.0
+pkgrel=0
+pkgdesc="Extra CMake modules"
+url="https://projects.kde.org/projects/kdesupport/extra-cmake-modules"
+arch="noarch"
+license="custom"
+depends="cmake"
+makedepends="py-sphinx cmake"
+subpackages="${pkgname}-doc"
+source="http://download.kde.org/stable/frameworks/${pkgver%.*}/$pkgname-$pkgver.tar.xz"
+builddir="$srcdir"/${pkgname}-${pkgver}/build
+
+build() {
+	mkdir -p "$builddir" && cd "$builddir"
+	cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=OFF || return 1
+	make || return 1
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="$pkgdir" install/fast || return 1
+
+	install -Dm644 ../COPYING-CMAKE-SCRIPTS \
+		"$pkgdir"/usr/share/licenses/$pkgname/COPYING
+}
+
+sha512sums="43bc1afb0bdb5fc74771e9ea30479995c43d7b74c7469c4d4e04303e209cfc1982834d085c6f4586271761832892fb0b3cb8e0723c332d01e544a4cd26e21e14  extra-cmake-modules-5.42.0.tar.xz"

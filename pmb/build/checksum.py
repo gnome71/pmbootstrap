@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -21,6 +21,7 @@ import logging
 import pmb.chroot
 import pmb.build
 import pmb.helpers.run
+import pmb.build.other
 
 
 def checksum(args, pkgname):
@@ -28,9 +29,9 @@ def checksum(args, pkgname):
     pmb.build.copy_to_buildpath(args, pkgname)
     logging.info("(native) generate checksums for " + pkgname)
     pmb.chroot.user(args, ["abuild", "checksum"],
-                    working_dir="/home/user/build")
+                    working_dir="/home/pmos/build")
 
     # Copy modified APKBUILD back
-    source = args.work + "/chroot_native/home/user/build/APKBUILD"
-    target = args.aports + "/" + pkgname + "/"
+    source = args.work + "/chroot_native/home/pmos/build/APKBUILD"
+    target = pmb.build.other.find_aport(args, pkgname) + "/"
     pmb.helpers.run.user(args, ["cp", source, target])

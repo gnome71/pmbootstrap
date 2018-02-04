@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -16,8 +16,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 """
-import pmb.helpers.run
 import pmb.aportgen.core
+import pmb.helpers.git
+import pmb.helpers.run
 
 
 def generate(args, pkgname):
@@ -25,12 +26,18 @@ def generate(args, pkgname):
     arch = pkgname.split("-")[1]
     path_original = "main/binutils"
     upstream = (args.work + "/cache_git/aports_upstream/" + path_original)
+    pmb.helpers.git.clone(args, "aports_upstream")
     pmb.helpers.run.user(args, ["cp", "-r", upstream, args.work + "/aportgen"])
+
+    # Architectures to build this package for
+    arches = list(pmb.config.build_device_architectures)
+    arches.remove(arch)
 
     # Rewrite APKBUILD
     fields = {
         "pkgname": pkgname,
         "pkgdesc": "Tools necessary to build programs for " + arch + " targets",
+        "arch": " ".join(arches),
         "makedepends_build": "",
         "makedepends_host": "",
         "makedepends": "gettext libtool autoconf automake bison",
@@ -39,7 +46,7 @@ def generate(args, pkgname):
 
     replace_functions = {
         "build": """
-            _target="$(arch_to_hostspec armhf)"
+            _target="$(arch_to_hostspec """ + arch + """)"
             cd "$builddir"
             "$builddir"/configure \\
                 --build="$CBUILD" \\
@@ -50,15 +57,15 @@ def generate(args, pkgname):
                 --enable-ld=default \\
                 --enable-gold=yes \\
                 --enable-plugins \\
+                --enable-deterministic-archives \\
                 --disable-multilib \\
                 --disable-werror \\
-                --disable-nls \\
-            || return 1
+                --disable-nls
             make
         """,
         "package": """
             cd "$builddir"
-            make install DESTDIR="$pkgdir" || return 1
+            make install DESTDIR="$pkgdir"
 
             # remove man, info folders
             rm -rf "$pkgdir"/usr/share

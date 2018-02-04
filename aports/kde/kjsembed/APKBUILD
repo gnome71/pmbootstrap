@@ -1,0 +1,33 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=kjsembed
+pkgver=5.42.0
+pkgrel=0
+pkgdesc='Embedded JS'
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="LGPL-2.1"
+depends=""
+depends_dev="qt5-qtsvg-dev kjs-dev ki18n-dev"
+makedepends="$depends_dev extra-cmake-modules qt5-qttools-dev kdoctools-dev"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/portingAids/${pkgname}-${pkgver}.tar.xz"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+sha512sums="6ff1212dd5e14528b52bd509a6c362e8e3db4b5e6033a9179c5b97a3751c2c6c9209e9a3111307a7d04eb9c5d4b7987d61fc619b17208397a01ad9e03d7bd8fa  kjsembed-5.42.0.tar.xz"

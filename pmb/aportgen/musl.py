@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -37,10 +37,21 @@ def generate(args, pkgname):
     pkgver = version.split("-r")[0]
     pkgrel = version.split("-r")[1]
 
+    # Architectures to build this package for
+    arches = list(pmb.config.build_device_architectures)
+    arches.remove(arch)
+
     # Copy the apk files to the distfiles cache
     for subpkgname in ["musl", "musl-dev"]:
-        path = glob.glob(args.work + "/cache_apk_" + arch + "/" + subpkgname +
-                         "-" + version + ".*.apk")[0]
+        pattern = (args.work + "/cache_apk_" + arch + "/" + subpkgname +
+                   "-" + version + ".*.apk")
+        glob_result = glob.glob(pattern)
+        if not len(glob_result):
+            raise RuntimeError("Could not find aport " + pattern + "!"
+                               " Update your aports_upstream git repo"
+                               " to the latest version, delete your http cache"
+                               " (pmbootstrap zap -hc) and try again.")
+        path = glob_result[0]
         path_target = (args.work + "/cache_distfiles/" + subpkgname + "-" +
                        version + "-" + arch + ".apk")
         if not os.path.exists(path_target):
@@ -59,9 +70,10 @@ def generate(args, pkgname):
         handle.write("# Automatically generated aport, do not edit!\n"
                      "# Generator: pmbootstrap aportgen " + pkgname + "\n"
                      "\n"
-                     "pkgname=" + pkgname + "\n"
-                     "pkgver=" + pkgver + "\n"
+                     "pkgname=\"" + pkgname + "\"\n"
+                     "pkgver=\"" + pkgver + "\"\n"
                      "pkgrel=" + pkgrel + "\n"
+                     "arch=\"" + " ".join(arches) + "\"\n"
                      "subpackages=\"musl-dev-" + arch + ":package_dev\"\n"
                      "\n"
                      "_arch=\"" + arch + "\"\n"
@@ -71,7 +83,6 @@ def generate(args, pkgname):
         static = """
             url="https://musl-libc.org"
             license="MIT"
-            arch="all"
             options="!check !strip"
             pkgdesc="the musl library (lib c) implementation for $_arch"
 
@@ -110,4 +121,4 @@ def generate(args, pkgname):
             handle.write(line[12:] + "\n")
 
         # Hashes
-        handle.write("sha512sums=\"" + hashes.rstrip() + "\"")
+        handle.write("sha512sums=\"" + hashes.rstrip() + "\"\n")

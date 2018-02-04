@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -16,16 +16,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 """
+import configparser
+import errno
 import logging
 import os
-import errno
 import pmb.chroot
 import pmb.config
 import pmb.chroot.apk
 
 
-def get_pid(args):
-    pidfile = args.work + "/chroot_native/home/user/distccd.pid"
+def get_running_pid(args):
+    """
+    :returns: the running distccd's pid as integer or None
+    """
+    pidfile = args.work + "/chroot_native/home/pmos/distccd.pid"
     if not os.path.exists(pidfile):
         return None
     with open(pidfile, "r") as handle:
@@ -33,9 +37,35 @@ def get_pid(args):
     return int(lines[0][:-1])
 
 
+def get_running_info(args):
+    """
+    :returns: A dictionary in the form of {"arch": .., "cmdline": "" }. arch is
+              the architecture (e.g. "armhf" or "aarch64"), and "cmdline" is the
+              saved value from the generate_cmdline() list, joined on space.
+              If the information can not be read, "arch" and "cmdline" are set to
+              "unknown".
+    The arch is used to print a nice stop message, the full cmdline is used to
+    check whether distccd needs to be restartet (e.g. because the arch has been
+    changed, or the verbose flag).
+    """
+    info = configparser.ConfigParser()
+    path = args.work + "/chroot_native/tmp/distccd_running_info"
+    if os.path.exists(path):
+        info.read(path)
+    else:
+        info["distccd"] = {}
+        info["distccd"]["arch"] = "unknown"
+        info["distccd"]["cmdline"] = "unknown"
+    return info["distccd"]
+
+
 def is_running(args):
+    """
+    :returns: When not running: None
+              When running: result from get_running_info()
+    """
     # Get the PID
-    pid = get_pid(args)
+    pid = get_running_pid(args)
     if not pid:
         return False
 
@@ -44,38 +74,66 @@ def is_running(args):
         os.kill(pid, 0)
     except OSError as err:
         if err.errno == errno.ESRCH:  # no such process
-            pmb.chroot.root(args, ["rm", "/home/user/distccd.pid"])
+            pmb.chroot.root(args, ["rm", "/home/pmos/distccd.pid"])
             return False
         elif err.errno == errno.EPERM:  # access denied
-            return True
+            return get_running_info(args)
 
 
-def start(args):
-    if is_running(args):
+def generate_cmdline(args, arch):
+    """
+    :returns: a dictionary suitable for pmb.chroot.user(), to start the distccd
+              with all options set.
+    NOTE: The distcc client of the foreign arch chroot passes the
+          absolute path to the compiler, which points to
+          "/usr/lib/arch-bin-masquerade/armhf/gcc" for example. This also
+          exists in the native chroot, and points to the armhf cross-
+          compiler there (both the native and foreign chroot have the
+          arch-bin-masquerade package installed, which creates the
+          wrapper scripts).
+    """
+    ret = ["distccd",
+           "--pid-file", "/home/pmos/distccd.pid",
+           "--listen", "127.0.0.1",
+           "--allow", "127.0.0.1",
+           "--port", args.port_distccd,
+           "--log-file", "/home/pmos/distccd.log",
+           "--jobs", args.jobs,
+           "--nice", "19",
+           "--job-lifetime", "60",
+           "--daemon"
+           ]
+    if args.verbose:
+        ret.append("--verbose")
+    return ret
+
+
+def start(args, arch):
+    # Skip when already running with the same cmdline
+    cmdline = generate_cmdline(args, arch)
+    info = is_running(args)
+    if info and info["cmdline"] == " ".join(cmdline):
         return
-    pmb.chroot.apk.install(args, ["distcc", "gcc-cross-wrappers"])
+    stop(args)
+    pmb.chroot.apk.install(args, ["distcc", "arch-bin-masquerade"])
 
     # Start daemon with cross-compiler in path
-    arch = args.deviceinfo["arch"]
-    path = "/usr/lib/gcc-cross-wrappers/" + arch + "/bin:" + pmb.config.chroot_path
-    daemon = ["PATH=" + path,
-              "distccd",
-              "--pid-file", "/home/user/distccd.pid",
-              "--listen", "127.0.0.1",
-              "--allow", "127.0.0.1",
-              "--port", args.port_distccd,
-              "--log-file", "/home/user/distccd.log",
-              "--jobs", args.jobs,
-              "--nice", "19",
-              "--job-lifetime", "60",
-              "--daemon"
-              ]
-    logging.info("(native) start distccd (listen on 127.0.0.1:" +
-                 args.port_distccd + ")")
-    pmb.chroot.user(args, daemon)
+    logging.info("(native) start distccd (" + arch + ") on 127.0.0.1:" +
+                 args.port_distccd)
+    pmb.chroot.user(args, cmdline)
+
+    # Write down the arch and cmdline (which also contains the relevant
+    # environment variables, /proc/$pid/cmdline does not!)
+    info = configparser.ConfigParser()
+    info["distccd"] = {}
+    info["distccd"]["arch"] = arch
+    info["distccd"]["cmdline"] = " ".join(cmdline)
+    with open(args.work + "/chroot_native/tmp/distccd_running_info", "w") as handle:
+        info.write(handle)
 
 
 def stop(args):
-    if is_running(args):
-        logging.info("(native) stop distccd")
-        pmb.chroot.user(args, ["kill", str(get_pid(args))])
+    info = is_running(args)
+    if info:
+        logging.info("(native) stop distccd (" + info["arch"] + ")")
+        pmb.chroot.user(args, ["kill", str(get_running_pid(args))])

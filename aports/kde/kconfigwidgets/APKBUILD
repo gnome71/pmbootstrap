@@ -1,0 +1,36 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=kconfigwidgets
+pkgver=5.42.0
+pkgrel=0
+pkgdesc='Widgets for KConfig'
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="LGPL-2.1"
+depends=""
+depends_dev="kcoreaddons-dev kauth-dev kguiaddons-dev kwidgetsaddons-dev kcodecs-dev kconfig-dev 
+			ki18n-dev"
+makedepends="$depends_dev extra-cmake-modules kdoctools-dev doxygen qt5-qttools-dev"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz"
+subpackages="$pkgname-dev $pkgname-doc $pkgname-lang"
+options="!check" # Fails due to requiring running X11
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib \
+		-DBUILD_QCH=ON
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+sha512sums="92a8b68be081cf40a54b7993cd9f0ba9f5d9a9170b3b13f8fb211f8770c0e2b5131be922f79d5e14157f1e655435a4f4d786426dae35c37dd69b52d58cecb62b  kconfigwidgets-5.42.0.tar.xz"

@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -18,6 +18,7 @@ along with pmbootstrap.  If not, see <http://www.gnu.org/licenses/>.
 """
 import logging
 import os
+import pmb.config
 
 
 def deviceinfo(args, device=None):
@@ -27,7 +28,12 @@ def deviceinfo(args, device=None):
     if not device:
         device = args.device
 
-    aport = args.aports + "/device-" + device
+    if not os.path.exists(args.aports):
+        logging.fatal("Aports directory is missing")
+        logging.fatal("Please provide a path to the aports directory using the -p flag")
+        raise RuntimeError("Aports directory missing")
+
+    aport = args.aports + "/device/device-" + device
     if not os.path.exists(aport) or not os.path.exists(aport + "/deviceinfo"):
         logging.fatal("You will need to create a device-specific package")
         logging.fatal("before you can continue. Please create at least the")
@@ -48,4 +54,16 @@ def deviceinfo(args, device=None):
             key = split[0][len("deviceinfo_"):]
             value = split[1].replace("\"", "").replace("\n", "")
             ret[key] = value
+
+    # Assign empty string as default
+    for key in pmb.config.deviceinfo_attributes:
+        if key not in ret:
+            ret[key] = ""
+
+    # Sanity check: "flash_methods" is legacy
+    if "flash_methods" in ret:
+        raise RuntimeError("deviceinfo_flash_methods has been renamed to"
+                           " deviceinfo_flash_method. Please adjust your"
+                           " deviceinfo file: " + path)
+
     return ret

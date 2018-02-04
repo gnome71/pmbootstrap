@@ -1,5 +1,5 @@
 """
-Copyright 2017 Oliver Smith
+Copyright 2018 Oliver Smith
 
 This file is part of pmbootstrap.
 
@@ -53,7 +53,8 @@ def root(args, cmd, suffix="native", working_dir="/", log=True,
     if not auto_init and not os.path.islink(chroot + "/bin/sh"):
         raise RuntimeError("Chroot does not exist: " + chroot)
 
-    pmb.chroot.init(args, suffix)
+    if auto_init:
+        pmb.chroot.init(args, suffix)
 
     # Run the args with sudo chroot, and with cleaned environment
     # variables
@@ -64,7 +65,7 @@ def root(args, cmd, suffix="native", working_dir="/", log=True,
                        " ".join(cmd))
 
     cmd_full = ["sudo", executables["sh"], "-c",
-                "unset $(env | cut -d= -f1);" +  # unset all
+                "env -i" +  # unset all
                 " CHARSET=UTF-8" +
                 " PATH=" + pmb.config.chroot_path +
                 " SHELL=/bin/ash" +

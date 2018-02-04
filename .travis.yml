@@ -1,11 +1,23 @@
 language: "python"
 python: "3.6"
+sudo: required
 addons:
   apt:
     sources:
     - debian-sid
-    packages:
-    - shellcheck
-install: "pip install flake8"
-script: "test/static_code_analysis.sh"
-
+install:
+  - sudo apt install shellcheck qemu-system-x86
+  - pip install flake8 pytest-cov python-coveralls
+script:
+  - test/static_code_analysis.sh
+  - yes "" | ./pmbootstrap.py init
+  - ./pmbootstrap.py kconfig_check
+  - test/check_checksums.py --build
+  - test/testcases_fast.sh
+after_success:
+  - coveralls
+after_failure:
+  - cat ~/.local/var/pmbootstrap/log.txt
+  - cat ~/.local/var/pmbootstrap/log_testsuite.txt
+notifications:
+  - email: false

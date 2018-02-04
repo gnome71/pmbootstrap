@@ -1,0 +1,36 @@
+# Contributor: Bart Ribbers <bribbers@disroot.org>
+# Maintainer: Bart Ribbers <bribbers@disroot.org>
+pkgname=kemoticons
+pkgver=5.42.0
+pkgrel=0
+pkgdesc='Support for emoticons and emoticons themes'
+arch="all"
+url='https://community.kde.org/Frameworks'
+license="GPL-2.0"
+depends=""
+depends_dev="karchive-dev kconfig-dev kservice-dev kcoreaddons-dev"
+makedepends="$depends_dev extra-cmake-modules doxygen qt5-qttools-dev"
+source="https://download.kde.org/stable/frameworks/${pkgver%.*}/${pkgname}-${pkgver}.tar.xz"
+subpackages="$pkgname-dev $pkgname-doc"
+options="!check" # Fails due to requiring running X11
+
+build() {
+	cmake \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DKDE_INSTALL_LIBDIR=lib \
+		-DBUILD_QCH=ON
+	make
+}
+
+check() {
+	cd "$builddir"
+	CTEST_OUTPUT_ON_FAILURE=TRUE ctest
+}
+
+
+package() {
+	cd "$builddir"
+	make DESTDIR="${pkgdir}" install
+}
+sha512sums="72015859b74201a3e6f6cb38863fa53ad5fa753f0866147c6c6a76edd8b637d1903ed2e0ef0d581ae191dfc642acf626ab010e6f72594f13f294e7c71da8bcd9  kemoticons-5.42.0.tar.xz"
