@@ -1,0 +1,32 @@
+# Deviceinfo for Jolla Phone - sbj.
+
+deviceinfo_format_version="0"
+deviceinfo_name="Jolla phone"
+deviceinfo_manufacturer="Jolla"
+deviceinfo_date=""
+deviceinfo_keyboard="false"
+deviceinfo_nonfree="????"
+deviceinfo_dtb=""
+deviceinfo_modules=""
+deviceinfo_modules_initfs=""
+deviceinfo_external_disk="true"
+deviceinfo_external_disk_install="true"
+deviceinfo_flash_method="fastboot"
+deviceinfo_arch="armhf"
+
+# Device related
+deviceinfo_keyboard="false"
+deviceinfo_screen_width="540"
+deviceinfo_screen_height="960"
+# deviceinfo_dev_touchscreen="/dev/input/event2"
+
+# Extracted from Jolla device original boot.img
+deviceinfo_kernel_cmdline="androidboot.hardware=qcom user_debug=31 ehci-hcd.park=3 maxcpus=2 zram.num_devices=2 root=/dev/mmcblk0p28"
+deviceinfo_generate_bootimg="true"
+deviceinfo_bootimg_qcdt="false"
+deviceinfo_flash_offset_base="0x80200000"
+deviceinfo_flash_offset_kernel="0x00008000"
+deviceinfo_flash_offset_ramdisk="0x02000000"
+deviceinfo_flash_offset_second="0x00f00000"
+deviceinfo_flash_offset_tags="0x00000100"
+deviceinfo_flash_pagesize="2048"
