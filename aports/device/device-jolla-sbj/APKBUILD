@@ -9,7 +9,15 @@ depends="mkbootimg linux-jolla-sbj"
 makedepends=""
 install=""
 subpackages=""
+<<<<<<< HEAD
 source="deviceinfo initfs-hook.sh profile.sh"
+=======
+source="
+	deviceinfo 
+	initfs-hook.sh 
+	profile.sh
+"
+>>>>>>> 7c94cfc9620cb3719a9a7fc8d63b9524359ca78d
 options="!check"
 
 build() {
