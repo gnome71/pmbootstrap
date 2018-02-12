@@ -22,7 +22,7 @@ case $pkgver in
 esac
 pkgrel=3
 arch="armhf"
-pkgdesc="Jolla phone kernel from sailfish 2"
+pkgdesc="Jolla phone kernel from djselbeck with opensource wlan drivers"
 url="http://releases.sailfishos.org/sources/2.0.5.6/"
 depends="postmarketos-mkinitfs"
 makedepends="perl sed installkernel bash gmp-dev bc linux-headers elfutils-dev"
@@ -31,6 +31,7 @@ install=
 source="
 	$pkgname-$_hash.tar.bz2::http://releases.sailfishos.org/sources/${_hash}/sailfish-${_hash}-oss-adaptation-sbj.tar.bz2
 	$_config
+	prima.tar.bz2
 	compiler-gcc6.h
 	duplicate-return-address-definition.patch
 	kgsl-iommu-locks.patch
@@ -46,11 +47,13 @@ HOSTCC="${HOSTCC#${CROSS_COMPILE}}"
 kver="kernel-adaptation-sbj-3.4.108.20161101.1"
 ksrcdir="$srcdir/$kver"
 kernelarchive="$srcdir/sailfish-${_hash}-oss-adaptation-sbj/kernel-adaptation-sbj/${kver}.tar.bz2"
+primadriver="prima.tar.bz2"
 
 prepare() {
 	local _patch_failed=
 	cd "$srcdir"
-	tar -xf "$kernelarchive"	
+	tar -xf "$kernelarchive"
+	tar -xf "$primadriver" -C "$ksrcdir/drivers/staging/"	
 	cd "$ksrcdir"
 
 	# first apply patches in specified order
