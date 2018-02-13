@@ -80,10 +80,12 @@ prepare() {
 	 cp -v "$srcdir/compiler-gcc6.h" "$ksrcdir/include/linux/"
 
 	mkdir -p "$srcdir"/build
-	cp "$srcdir"/$_config "$srcdir"/build/.config || return 1
-	cp "$srcdir"/prima "$srcdir"/build/drivers/staging/
+	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
+	cp -v "$srcdir"/prima "$srcdir"/build/drivers/staging/
 	# debug
+	error "Debug breakpoint"
 	return 1
+	# end debug
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
 		silentoldconfig
 }
