@@ -50,7 +50,7 @@ kernelarchive="$srcdir/$pkgname-$_hash.zip"
 prepare() {
 	local _patch_failed=
 	cd "$srcdir"
-	tar -xf "$kernelarchive"
+	unzip "$kernelarchive"
 	cd "$ksrcdir"
 
 	# first apply patches in specified order
