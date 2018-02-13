@@ -81,11 +81,11 @@ prepare() {
 
 	mkdir -p "$srcdir"/build
 
-	msg "srcdir = $srcdir"
+	msg "srcdir  = $srcdir"
 	msg "ksrcdir = $ksrcdir"
 	
 	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
-	cp -v -R "$srcdir/prima" "$Ksrcdir/drivers/staging/"
+	cp -v -R "$srcdir/prima" "$ksrcdir/drivers/staging/"
 	# debug
 	msg "Debug breakpoint"
 	return 1
