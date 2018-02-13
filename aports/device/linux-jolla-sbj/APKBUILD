@@ -80,9 +80,6 @@ prepare() {
 	 cp -v "$srcdir/compiler-gcc6.h" "$ksrcdir/include/linux/"
 
 	mkdir -p "$srcdir"/build
-
-	msg "srcdir  = $srcdir"
-	msg "ksrcdir = $ksrcdir"
 	
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" mrproper
 	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
