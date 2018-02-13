@@ -83,7 +83,7 @@ prepare() {
 	msg "srcdir  = $srcdir"
 	msg "ksrcdir = $ksrcdir"
 	
-	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
+	#cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
 
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
 		silentoldconfig
@@ -97,6 +97,7 @@ menuconfig() {
 }
 
 build() {
+	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
 	cd "$srcdir"/build
 	unset LDFLAGS
 	make ARCH="$_carch" CC="${CC:-gcc}" \
