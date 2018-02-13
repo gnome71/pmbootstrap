@@ -80,7 +80,7 @@ prepare() {
 	msg "srcdir  = $srcdir"
 	msg "ksrcdir = $ksrcdir"
 	
-	cp -v -f "$srcdir"/$_config "$srcdir"/build/.config || return 1
+	cp -v -u "$srcdir"/$_config "$srcdir"/build/.config || return 1
 	# debug
 	#msg "Debug breakpoint"
 	#return 1
