@@ -44,7 +44,7 @@ HOSTCC="${CC:-gcc}"
 HOSTCC="${HOSTCC#${CROSS_COMPILE}}"
 
 kver="sailfishos_kernel_jolla_msm8930"
-ksrcdir="$srcdir/$kver"
+ksrcdir="$srcdir/sailfishos_kernel_jolla_msm8930-7a081f367ac1fc006ab1e4b0d63aa5ea7bea8a70"
 kernelarchive="$srcdir/$pkgname-$_hash.zip"
 
 msg "## srcdir:  ${srcdir}"
