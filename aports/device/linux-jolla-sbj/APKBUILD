@@ -87,8 +87,8 @@ prepare() {
 	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
 	cp -v -R "$srcdir/prima" "$ksrcdir/drivers/staging/"
 	# debug
-	msg "Debug breakpoint"
-	return 1
+	#msg "Debug breakpoint"
+	#return 1
 	# end debug
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
 		silentoldconfig
