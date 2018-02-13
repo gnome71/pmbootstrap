@@ -23,13 +23,13 @@ esac
 pkgrel=3
 arch="armhf"
 pkgdesc="Jolla phone kernel from djselbeck with opensource wlan drivers"
-url="https://github.com/djselbeck/sailfishos_kernel_jolla_msm8930/archive/7a081f367ac1fc006ab1e4b0d63aa5ea7bea8a70.zip"
+url="https://github.com/djselbeck/sailfishos_kernel_jolla_msm8930/archive/master.zip"
 depends="postmarketos-mkinitfs"
 makedepends="perl sed installkernel bash gmp-dev bc linux-headers elfutils-dev"
 options="!strip !check !tracedeps"
 install=
 source="
-	$pkgname-$_hash.zip::https://github.com/djselbeck/sailfishos_kernel_jolla_msm8930/archive/7a081f367ac1fc006ab1e4b0d63aa5ea7bea8a70.zip
+	$pkgname-$_hash.zip::https://github.com/djselbeck/sailfishos_kernel_jolla_msm8930/archive/master.zip
 	$_config
 	compiler-gcc6.h
 	duplicate-return-address-definition.patch
@@ -44,7 +44,7 @@ HOSTCC="${CC:-gcc}"
 HOSTCC="${HOSTCC#${CROSS_COMPILE}}"
 
 kver="sailfishos_kernel_jolla_msm8930"
-ksrcdir="$srcdir/sailfishos_kernel_jolla_msm8930-7a081f367ac1fc006ab1e4b0d63aa5ea7bea8a70"
+ksrcdir="$srcdir/sailfishos_kernel_jolla_msm8930-master"
 kernelarchive="$srcdir/$pkgname-$_hash.zip"
 
 msg "## srcdir:  ${srcdir}"
