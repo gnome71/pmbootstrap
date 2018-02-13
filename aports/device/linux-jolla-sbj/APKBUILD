@@ -84,6 +84,9 @@ prepare() {
 	msg "ksrcdir = $ksrcdir"
 	
 	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
+
+	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
+		mrproper
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
 		silentoldconfig
 }
