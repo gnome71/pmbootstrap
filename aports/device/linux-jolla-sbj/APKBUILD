@@ -51,6 +51,7 @@ msg "## srcdir:  ${srcdir}"
 msg "## ksrcdir: ${ksrcdir}"
 
 prepare() {
+	msg "## prepare()"
 	local _patch_failed=
 	cd "$srcdir"
 	unzip -n "$kernelarchive"
@@ -90,12 +91,14 @@ prepare() {
 
 # this is so we can do: 'abuild menuconfig' to reconfigure kernel
 menuconfig() {
+	msg "## menuconfig()"
 	cd "$srcdir"/build || return 1
 	make ARCH="$_carch" menuconfig
 	cp .config "$startdir"/$_config
 }
 
 build() {
+	msg "## build()"
 	cd "$srcdir"/build
 	unset LDFLAGS
 	make ARCH="$_carch" CC="${CC:-gcc}" mrproper
