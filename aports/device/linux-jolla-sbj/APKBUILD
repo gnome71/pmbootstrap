@@ -98,6 +98,7 @@ menuconfig() {
 build() {
 	cd "$srcdir"/build
 	unset LDFLAGS
+	make ARCH="$_carch" CC="${CC:-gcc}" mrproper
 	make ARCH="$_carch" CC="${CC:-gcc}" \
 		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-Alpine" \
 		|| return 1
