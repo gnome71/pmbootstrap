@@ -50,7 +50,7 @@ kernelarchive="$srcdir/$pkgname-$_hash.zip"
 prepare() {
 	local _patch_failed=
 	cd "$srcdir"
-	unzip "$kernelarchive"
+	unzip -n "$kernelarchive"
 	cd "$ksrcdir"
 
 	# first apply patches in specified order
@@ -80,11 +80,8 @@ prepare() {
 	msg "srcdir  = $srcdir"
 	msg "ksrcdir = $ksrcdir"
 	
-	cp -v -u "$srcdir"/$_config "$srcdir"/build/.config || return 1
-	# debug
-	#msg "Debug breakpoint"
-	#return 1
-	# end debug
+	rm "$srcdir"/build/.config || return 1
+	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
 		silentoldconfig
 }
