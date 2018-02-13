@@ -81,7 +81,7 @@ prepare() {
 
 	mkdir -p "$srcdir"/build
 	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
-	cp -v -R "$srcdir"/prima "$srcdir"/build/drivers/staging/
+	cp -v -R "$srcdir"/prima "$Ksrcdir"/drivers/staging/
 	# debug
 	error "Debug breakpoint"
 	return 1
