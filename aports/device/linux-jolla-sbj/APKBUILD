@@ -47,7 +47,7 @@ kver="sailfishos_kernel_jolla_msm8930"
 ksrcdir="$srcdir/$kver"
 kernelarchive="$srcdir/$pkgname-$_hash.zip"
 
-msg "srcdir: ${srcdir}
+msg "srcdir: ${srcdir}"
 
 prepare() {
 	local _patch_failed=
