@@ -99,6 +99,7 @@ build() {
 	cd "$srcdir"/build
 	unset LDFLAGS
 	make ARCH="$_carch" CC="${CC:-gcc}" mrproper
+	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
 	make ARCH="$_carch" CC="${CC:-gcc}" \
 		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-Alpine" \
 		|| return 1
