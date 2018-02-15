@@ -30,8 +30,8 @@ options="!strip !check !tracedeps"
 install=
 source="
 	$pkgname-$_hash.zip::https://github.com/djselbeck/sailfishos_kernel_jolla_msm8930/archive/master.zip
+	WCNSS_qcom_wlan_nv.bin::https://source.codeaurora.org/external/wlan/prima/tree/firmware_bin/WCNSS_qcom_wlan_nv.bin?id=ff1b5d35e24178b292658b22f11cf9bca56c908d
 	$_config
-	WCNSS_qcom_wlan_nv.bin
 	compiler-gcc6.h
 	duplicate-return-address-definition.patch
 	kgsl-iommu-locks.patch
@@ -121,8 +121,8 @@ package() {
 }
 
 sha512sums="dc0d8358f062aaab562c0f54c7f93e46dbf172b1206db14a3d4bdfd703201f170df3bdbdc5b16c51c721cd3a6c3835e44f2753f18c247b2dd6225128e639debc  linux-jolla-sbj-2.0.5.6.zip
+250cab2266736499bc00ac521ec0528648d83e99cb7b9c1fea731abd5669a2a1d5f7635d43c19b1b2db058926bd7ec042a29d83c7e33c9664c7e7e72783d5153  WCNSS_qcom_wlan_nv.bin
 6e3b61ba8c32414e74b173bbcc231a84160dd2fdf9dc85bebece683c1d268659242f4ed6dbb615e1dd7242f13b0e885c1a5e2827c8db4154ac636ca405515f8e  config-jolla-sbj.armhf
-e61b83575b192480f7db7f8d30ca02f87d244a7013a8be8fe4325461c9508b60da167be4e49cf031e784cc05b7a5661b36c87faa813e3f84d0b3ce7dc20d18a6  WCNSS_qcom_wlan_nv.bin
 d80980e9474c82ba0ef1a6903b434d8bd1b092c40367ba543e72d2c119301c8b2d05265740e4104ca1ac5d15f6c4aa49e8776cb44264a9a28dc551e0d1850dcc  compiler-gcc6.h
 ea1d3b5a234fa565e3c1a792de48f4fc4e6023d281d303c8e319c7ef28edc5739ab0e4dea0139a41f0a5c7d03e27921ccaa214fd0ac5c72245a094ce60128864  duplicate-return-address-definition.patch
 63d18b49c7311fe60e52192dda9a420259e173110ef99a2743db99fa550c9c2b3089f338d65b98c0b825987abbd2eb601c47b03afc835c340256c0dbf1023745  kgsl-iommu-locks.patch
