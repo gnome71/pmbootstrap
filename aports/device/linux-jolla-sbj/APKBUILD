@@ -25,15 +25,20 @@ arch="armhf"
 pkgdesc="Jolla phone kernel from djselbeck with opensource wlan drivers"
 url="http://releases.sailfishos.org/sources/2.0.5.6/"
 depends="postmarketos-mkinitfs"
-makedepends="perl sed installkernel bash gmp-dev bc linux-headers elfutils-dev"
+makedepends="perl sed installkernel bash gmp-dev bc linux-headers elfutils-dev git"
 options="!strip !check !tracedeps"
 install=
 source="
 	$pkgname-$_hash.tar.bz2::http://releases.sailfishos.org/sources/${_hash}/sailfish-${_hash}-oss-adaptation-sbj.tar.bz2
+	Kconfig-prima
+	Makefile-prima
 	$_config
 	compiler-gcc6.h
 	duplicate-return-address-definition.patch
 	gpu-msm-fix-gcc5-compile.patch
+	add-prima-kernel-driver.patch
+	impl.patch
+	makefile.patch
 "
 subpackages=""
 license="GPL2"
@@ -46,12 +51,15 @@ HOSTCC="${HOSTCC#${CROSS_COMPILE}}"
 kver="kernel-adaptation-sbj-3.4.108.20161101.1"
 ksrcdir="$srcdir/$kver"
 kernelarchive="$srcdir/sailfish-${_hash}-oss-adaptation-sbj/kernel-adaptation-sbj/${kver}.tar.bz2"
-primadriver="prima.tar.bz2"
 
 prepare() {
+	msg "### prepare"
+
 	local _patch_failed=
 	cd "$srcdir"
 	tar -xf "$kernelarchive"
+	git clone -b jb_rel --single-branch https://source.codeaurora.org/external/wlan/prima
+	cp -R "$srcdir/prima/" "$ksrcdir/drivers/staging/prima/"
 	cd "$ksrcdir"
 
 	# first apply patches in specified order
@@ -74,34 +82,42 @@ prepare() {
 	fi
 
 	# gcc6 support
-	 cp -v "$srcdir/compiler-gcc6.h" "$ksrcdir/include/linux/"
+	cp -v "$srcdir/compiler-gcc6.h" "$ksrcdir/include/linux/"
+	
+	# prima build files
+	cp -v "$srcdir/Kconfig-prima" "$ksrcdir/drivers/staging/prima/Kconfig"
+	cp -v "$srcdir/Makefile-prima" "$ksrcdir/drivers/staging/prima/Makefile" 
 
 	mkdir -p "$srcdir"/build
 
-	msg "srcdir  = $srcdir"
-	msg "ksrcdir = $ksrcdir"
-	
 	cp -v "$srcdir"/$_config "$srcdir"/build/.config || return 1
-
+	
 	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
 		silentoldconfig
 }
 
-
-
 # this is so we can do: 'abuild menuconfig' to reconfigure kernel
 menuconfig() {
+	msg "### menuconfig"
 	cd "$srcdir"/build || return 1
 	make ARCH="$_carch" menuconfig
 	cp .config "$startdir"/$_config
 }
 
 build() {
+	msg "### build"
+
 	cd "$srcdir"/build
 	unset LDFLAGS
 	make ARCH="$_carch" CC="${CC:-gcc}" \
 		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-Alpine" \
 		|| return 1
+
+	echo "--[ Build modules ]--"
+	make ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-Alpine" CONFIG_NO_ERROR_ON_MISMATCH=y \
+		modules
+
 }
 
 package() {
@@ -110,10 +126,21 @@ package() {
 
 	install -D "$srcdir/build/include/config/kernel.release" \
 		"$pkgdir/usr/share/kernel/$_flavor/kernel.release"
+
+	echo "--[ Installing modules ]--"
+	make ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-Alpine" CONFIG_NO_ERROR_ON_MISMATCH=y \
+		INSTALL_MOD_PATH="$pkgdir" modules_install
+
 }
 
 sha512sums="4e9f7c26fbe47e2244b038137b8b4c4796a1910db7fe58cc87d52f5a71fa06adaf5c76962f7fc3a62ee8dff765469c6b68e3f0b37250c2db95bdfcdc3dc5ca7a  linux-jolla-sbj-2.0.5.6.tar.bz2
-96bf568a1ece75508d0f39d63db5c45bb6030ce9277cb56db01065b1c9b5a7babe9a14c4486158190b1e0eab9543af9d1b2926dd0a5bc5610b57146c93267a24  config-jolla-sbj.armhf
+95ff8c1e9c2733eec9c8905ab71e0f832a66e9974a31857d51944fc48532ae34c77772174e0942b4e68eb844cbb7b97e2cfd1b3e5a18fe79a4af9e7843a3c83a  Kconfig-prima
+290cdd7af61d8c065d5f2f15882ec6f9aed19905e326dfc0a886135d7c56abbfaf7d8db73fc60a538b8c1364dd9778e5e8e565fe3ac54d6986d37e203bf62eb5  Makefile-prima
+754d16b50c6df8444f9af673048b8a3b12be44dbccc9b4670be58274ebf3f61efe83005dcaf08fba8addd9219cf0bd06e5b128e44fc420d2bae78fcca17a4db0  config-jolla-sbj.armhf
 d80980e9474c82ba0ef1a6903b434d8bd1b092c40367ba543e72d2c119301c8b2d05265740e4104ca1ac5d15f6c4aa49e8776cb44264a9a28dc551e0d1850dcc  compiler-gcc6.h
 ea1d3b5a234fa565e3c1a792de48f4fc4e6023d281d303c8e319c7ef28edc5739ab0e4dea0139a41f0a5c7d03e27921ccaa214fd0ac5c72245a094ce60128864  duplicate-return-address-definition.patch
-7be03a9e78b7ac330a54b1f00509caa0621a95c0c55901878ad757f9dd69cc05ba2c8b5ea987063ae1224f92c4d090d515fa5d369e7755181a4871b0d0f82881  gpu-msm-fix-gcc5-compile.patch"
+7be03a9e78b7ac330a54b1f00509caa0621a95c0c55901878ad757f9dd69cc05ba2c8b5ea987063ae1224f92c4d090d515fa5d369e7755181a4871b0d0f82881  gpu-msm-fix-gcc5-compile.patch
+31ea8b83d2345b2abdc15281ae407b32db9d86b409635f14d0bf851bb6c270319615a2b714a83d8fd59d374edca88cc0cd7491dc6849e49391f435318af88edb  add-prima-kernel-driver.patch
+8f23b449f2d2a623a39572c1cd6d922a25f4619332d11150dcf804ae0a196cd9de23e4d947af0a7a357ba48e62b777aa61b7b7cff55339544975770bb00519e3  impl.patch
+01425f320db7600579794a71ec19697ce3ac8b0c7fe1b499afa18837e287255fa12a93a9419720b3a29cc43614d63e9d7e7ebdaa3fe11e9b5a0fc6c20810e6e2  makefile.patch"
