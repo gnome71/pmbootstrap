@@ -25,7 +25,7 @@ import pytest
 pmb_src = os.path.realpath(os.path.join(os.path.dirname(__file__) + "/.."))
 sys.path.append(pmb_src)
 import pmb.parse.apkindex
-import pmb.parse.apkbuild
+import pmb.parse
 import pmb.helpers.logging
 
 
@@ -46,12 +46,13 @@ def test_qt_versions(args):
     qt5-qtbase version.
     """
     # Upstream version
-    pmb.helpers.repo.update(args)
+    pmb.helpers.repo.update(args, "armhf")
     repository = args.mirror_alpine + args.alpine_version + "/community"
     hash = pmb.helpers.repo.hash(repository)
     index_path = (args.work + "/cache_apk_armhf/APKINDEX." + hash +
                   ".tar.gz")
-    index_data = pmb.parse.apkindex.read(args, "qt5-qtbase", index_path)
+    index_data = pmb.parse.apkindex.package(args, "qt5-qtbase",
+                                            indexes=[index_path])
     pkgver_upstream = index_data["version"].split("-r")[0]
 
     # Iterate over our packages
@@ -84,7 +85,7 @@ def test_aportgen_versions(args):
     """
 
     # Get Alpine's "main" repository APKINDEX path
-    pmb.helpers.repo.update(args)
+    pmb.helpers.repo.update(args, "armhf")
     repository = args.mirror_alpine + args.alpine_version + "/main"
     hash = pmb.helpers.repo.hash(repository)
     index_path = (args.work + "/cache_apk_armhf/APKINDEX." + hash +
@@ -101,7 +102,8 @@ def test_aportgen_versions(args):
     generated = "# Automatically generated aport, do not edit!"
     for pkgname, pattern in map.items():
         # Upstream version
-        index_data = pmb.parse.apkindex.read(args, pkgname, index_path)
+        index_data = pmb.parse.apkindex.package(args, pkgname,
+                                                indexes=[index_path])
         version_upstream = index_data["version"]
 
         # Iterate over our packages

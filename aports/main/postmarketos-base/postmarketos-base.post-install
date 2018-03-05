@@ -1,7 +1,5 @@
 #!/bin/sh
 
-. /etc/deviceinfo
-
 # Enable udev OpenRC services and runlevels
 # https://github.com/alpinelinux/aports/blob/master/main/eudev/setup-udev
 setup-udev -n
@@ -13,15 +11,12 @@ done
 for service in hwclock modules sysctl hostname bootmisc swclock syslog; do
 	rc-update -q add $service boot
 done
-for service in dbus haveged sshd swapfile wpa_supplicant chronyd; do
+for service in dbus haveged sshd swapfile wpa_supplicant chronyd local networkmanager wpa_supplicant; do
 	rc-update -q add $service default
 done
 for service in mount-ro killprocs savecache; do
 	rc-update -q add $service shutdown
 done
-if [ "${deviceinfo_msm_refresher}" = "true" ]; then
-	rc-update -q add msm-fb-refresher boot
-fi
 
 # Prime swclock with a reasonable date/time on first boot
 mkdir -p /run/openrc
@@ -41,6 +36,7 @@ write_unless_modified() {
 	echo 'LABEL="pmOS_root"	/	ext4	relatime,data=ordered	0	1'
 	echo 'LABEL="pmOS_boot"	/boot	auto	defaults		0	2'
 } | write_unless_modified /etc/fstab
+
 # Set /etc/issue
   {
 	echo 'Welcome to postmarketOS'
@@ -48,6 +44,7 @@ write_unless_modified() {
 	# setterm -powersave on -blank 5
 	echo -ne "\033[9;5]"
   } | write_unless_modified /etc/issue
+
 # Set /etc/motd
 {
 	echo 'Welcome to postmarketOS!'
@@ -60,6 +57,12 @@ write_unless_modified() {
 	echo 'You may change this message by editing /etc/motd.'
 	echo ''
 } | write_unless_modified /etc/motd
+
+# Change wpa_supplicant into dbus mode and enable both drivers
+{
+	echo 'wpa_supplicant_args="-u -Dwext,nl80211"'
+} | write_unless_modified /etc/conf.d/wpa_supplicant
+touch /etc/wpa_supplicant/wpa_supplicant.conf
 
 # Enable syslog to SHM. Note: size is 4048KiB, which *should* be More Than Enough(TM) for all but the most chattiest of devices.
 sed s/=\"/=\""-C4048 "/  -i /etc/conf.d/syslog
@@ -75,7 +78,7 @@ sed -i 's/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/' /etc/sudoers
 
 # Add user to video group for proper framebuffer permissions
 username="$(getent passwd 1000 | cut -d ":" -f 1)"
-usermod -a -G video "$username"
+usermod -a -G video,audio "$username"
 
 # Set chrony to quickly correct system time on first boot, if necessary
 if ! grep -q "makestep" /etc/chrony/chrony.conf; then

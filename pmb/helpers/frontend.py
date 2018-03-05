@@ -120,11 +120,17 @@ def build(args):
         for package in args.packages:
             _build_device_depends_note(args, package)
 
+    # Set src and force
+    src = os.path.realpath(os.path.expanduser(args.src[0])) if args.src else None
+    force = True if src else args.force
+    if src and not os.path.exists(src):
+        raise RuntimeError("Invalid path specified for --src: " + src)
+
     # Build all packages
     for package in args.packages:
         arch_package = args.arch or pmb.build.autodetect.arch(args, package)
-        if not pmb.build.package(args, package, arch_package, args.force,
-                                 args.strict):
+        if not pmb.build.package(args, package, arch_package, force,
+                                 args.strict, src=src):
             logging.info("NOTE: Package '" + package + "' is up to date. Use"
                          " 'pmbootstrap build " + package + " --force'"
                          " if needed.")
@@ -143,6 +149,8 @@ def checksum(args):
 def chroot(args):
     suffix = _parse_suffix(args)
     pmb.chroot.apk.check_min_version(args, suffix)
+    if args.add:
+        pmb.chroot.apk.install(args, args.add.split(","), suffix)
     logging.info("(" + suffix + ") % " + " ".join(args.command))
     pmb.chroot.root(args, args.command, suffix, log=False)
 
@@ -199,7 +207,14 @@ def menuconfig(args):
 
 
 def update(args):
-    pmb.helpers.repo.update(args, True)
+    existing_only = not args.non_existing
+    if not pmb.helpers.repo.update(args, args.arch, True, existing_only):
+        logging.info("No APKINDEX files exist, so none have been updated."
+                     " The pmbootstrap command downloads the APKINDEX files on"
+                     " demand.")
+        logging.info("If you want to force downloading the APKINDEX files for"
+                     " all architectures (not recommended), use:"
+                     " pmbootstrap update --non-existing")
 
 
 def newapkbuild(args):

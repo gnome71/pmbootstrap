@@ -111,6 +111,8 @@ def arguments_qemu(subparser):
                      help="guest RAM (default: 1024)")
     ret.add_argument("-p", "--port", type=int, default=2222,
                      help="SSH port (default: 2222)")
+    ret.add_argument("--flavor", help="name of the kernel flavor (run 'pmbootstrap flasher list_flavors'"
+                     " to get a list of all installed flavors")
 
     display = ret.add_mutually_exclusive_group()
     display.add_argument("--spice", dest="spice_port", const="8077",
@@ -205,7 +207,6 @@ def arguments():
     sub.add_parser("shutdown", help="umount, unregister binfmt")
     sub.add_parser("index", help="re-index all repositories with custom built"
                    " packages (do this after manually removing package files)")
-    sub.add_parser("update", help="update all APKINDEX files")
     arguments_export(sub)
     arguments_flasher(sub)
     arguments_initfs(sub)
@@ -245,10 +246,21 @@ def arguments():
     stats = sub.add_parser("stats", help="show ccache stats")
     stats.add_argument("--arch", default=arch_native, choices=arch_choices)
 
+    # Action: update
+    update = sub.add_parser("update", help="update all existing APKINDEX"
+                            " files")
+    update.add_argument("--arch", default=None, choices=arch_choices,
+                        help="only update a specific architecture")
+    update.add_argument("--non-existing", action="store_true", help="do not"
+                        " only update the existing APKINDEX files, but all of"
+                        " them", dest="non_existing")
+
     # Action: build_init / chroot
     build_init = sub.add_parser("build_init", help="initialize build"
                                 " environment (usually you do not need to call this)")
     chroot = sub.add_parser("chroot", help="start shell in chroot")
+    chroot.add_argument("--add", help="build/install comma separated list of"
+                        " packages in the chroot before entering it")
     chroot.add_argument("command", default=["sh"], help="command"
                         " to execute inside the chroot. default: sh", nargs='*')
     for action in [build_init, chroot]:
@@ -314,6 +326,11 @@ def arguments():
                        " necessary")
     build.add_argument("--strict", action="store_true", help="(slower) zap and install only"
                        " required depends when building, to detect dependency errors")
+    build.add_argument("--src", help="override source used to build the"
+                       " package with a local folder (the APKBUILD must"
+                       " expect the source to be in $builddir, so you might"
+                       " need to adjust it)",
+                       nargs=1)
     build.add_argument("-i", "--ignore-depends", action="store_true",
                        help="only build and install makedepends from an"
                        " APKBUILD, ignore the depends (old behavior). This is"

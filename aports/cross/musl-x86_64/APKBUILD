@@ -2,8 +2,8 @@
 # Generator: pmbootstrap aportgen musl-x86_64
 
 pkgname="musl-x86_64"
-pkgver="1.1.18"
-pkgrel=7
+pkgver="1.1.19"
+pkgrel=0
 arch="armhf aarch64 x86"
 subpackages="musl-dev-x86_64:package_dev"
 
@@ -46,5 +46,5 @@ package_dev() {
     done
 }
 
-sha512sums="dddac68fc4c6598fb5576881ece8ca6c81813266ba1c2d34a7289813291fdf9337814ad7eeb8596b6aed121adfc4cf48eacb7488dbb706a032ba83269386588b  musl-1.1.18-r7-x86_64.apk
-fd1e3c56bf7040a846fd05d338f90219e67c8f77fbd56f7b7aa31db5685fb059af582ec638c85c76a80e796ce411a2bcb78e9fca5f1b7b04aacfae55e6eee68d  musl-dev-1.1.18-r7-x86_64.apk"
+sha512sums="a47874f8c81bc9ef7c5acba3274ec813ceffd4db888688c9e18be4b33152a6aa7b05c767413cf8f5bb620e27e777114e6a5177e77aec51df8e28b6045b7ca105  musl-1.1.19-r0-x86_64.apk
+2887174edfeed1d68872595b36b107386b9f9472317bdb25933ca89b3c8497f5690e006c595a763302166b14efd4ad29815adb977b51d8747244fb37fd9ee8ed  musl-dev-1.1.19-r0-x86_64.apk"

@@ -30,7 +30,7 @@ from pmb.config.merge_with_args import merge_with_args
 #
 # Exported variables (internal configuration)
 #
-version = "0.6.0"
+version = "0.7.0"
 pmb_src = os.path.normpath(os.path.realpath(__file__) + "/../../..")
 apk_keys_path = pmb_src + "/keys"
 
@@ -46,6 +46,7 @@ work_version = "1"
 
 # Only save keys to the config file, which we ask for in 'pmbootstrap init'.
 config_keys = ["ccache_size", "device", "extra_packages", "jobs", "keymap",
+               "nonfree_firmware", "nonfree_userland",
                "qemu_native_mesa_driver", "timezone", "ui", "user", "work"]
 
 # Config file/commandline default values
@@ -70,6 +71,8 @@ defaults = {
     "log": "$WORK/log.txt",
     "mirror_alpine": "http://dl-cdn.alpinelinux.org/alpine/",
     "mirror_postmarketos": "http://postmarketos.brixit.nl",
+    "nonfree_firmware": True,
+    "nonfree_userland": False,
     "port_distccd": "33632",
     "qemu_native_mesa_driver": "dri-virtio",
     "timezone": "GMT",
@@ -158,16 +161,20 @@ build_cross_native = ["linux-*", "arch-bin-masquerade"]
 
 # Necessary kernel config options
 necessary_kconfig_options = {
-    "ANDROID_PARANOID_NETWORK": False,
-    "DEVTMPFS": True,
-    "DEVTMPFS_MOUNT": False,
-    "DM_CRYPT": True,
-    "EXT4_FS": True,
-    "PFT": False,
-    "SYSVIPC": True,
-    "VT": True
+    "all": {
+        "ANDROID_PARANOID_NETWORK": False,
+        "DEVTMPFS": True,
+        "DEVTMPFS_MOUNT": False,
+        "DM_CRYPT": True,
+        "EXT4_FS": True,
+        "PFT": False,
+        "SYSVIPC": True,
+        "VT": True
+    },
+    "armhf x86": {
+        "LBDAF": True
+    }
 }
-
 
 #
 # PARSE
